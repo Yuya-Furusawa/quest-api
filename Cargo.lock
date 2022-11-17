@@ -420,10 +420,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "hyper",
+ "mime",
  "nanoid",
  "serde",
  "serde_json",
  "tokio",
+ "tower",
  "tracing",
  "tracing-subscriber",
 ]

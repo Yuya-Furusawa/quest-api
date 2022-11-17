@@ -103,7 +103,7 @@ impl QuestRepository for QuestRepositoryForMemory {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Difficulty {
     Easy,
     Normal,
@@ -112,13 +112,13 @@ pub enum Difficulty {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Quest {
-    id: String,
-    title: String,
-    description: String,
-    price: u32, // 0ならFree
-    difficulty: Difficulty,
-    num_participate: u32,
-    num_clear: u32,
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub price: u32, // 0ならFree
+    pub difficulty: Difficulty,
+    pub num_participate: u32,
+    pub num_clear: u32,
     // prize: String,
     // rating: u8,
     // created_at: DateTime<Local>,
@@ -126,7 +126,7 @@ pub struct Quest {
 }
 
 impl Quest {
-    fn new(
+    pub fn new(
         id: String,
         title: String,
         description: String,
@@ -147,6 +147,18 @@ impl Quest {
     }
 }
 
+// 各fieldが一致したとき==とみなす
+impl PartialEq for Quest {
+    fn eq(&self, other: &Quest) -> bool {
+        (self.title == other.title)
+            && (self.description == other.description)
+            && (self.price == other.price)
+            && (self.difficulty == other.difficulty)
+            && (self.num_participate == other.num_participate)
+            && (self.num_clear == other.num_clear)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateQuest {
     title: String,
@@ -155,6 +167,26 @@ pub struct CreateQuest {
     difficulty: Difficulty,
     num_participate: u32,
     num_clear: u32,
+}
+
+impl CreateQuest {
+    pub fn new(
+        title: String,
+        description: String,
+        price: u32,
+        difficulty: Difficulty,
+        num_participate: u32,
+        num_clear: u32,
+    ) -> Self {
+        Self {
+            title,
+            description,
+            price,
+            difficulty,
+            num_participate,
+            num_clear,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
