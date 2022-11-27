@@ -6,19 +6,24 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use std::{
-    net::SocketAddr,
-    sync::Arc,
-};
+use dotenv::dotenv;
+use sqlx::PgPool;
+use std::{env, net::SocketAddr, sync::Arc};
 
-use crate::handlers::quest::{create_quest, find_quest, all_quests, update_quest, delete_quest};
-use crate::repositories::quest::{QuestRepository, QuestRepositoryForMemory};
+use crate::handlers::quest::{all_quests, create_quest, delete_quest, find_quest, update_quest};
+use crate::repositories::quest::{QuestRepository, QuestRepositoryForDb};
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let app = create_app(QuestRepositoryForMemory::new());
+    dotenv().ok();
+    let database_url = &env::var("DATABASE_URL").expect("undefined [DATABASE_URL]");
+    let pool = PgPool::connect(database_url)
+        .await
+        .expect(&format!("fail connect database, url is [{}]", database_url));
+
+    let app = create_app(QuestRepositoryForDb::new(pool.clone()));
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
 
@@ -30,21 +35,15 @@ async fn main() {
         .unwrap();
 }
 
-fn create_app<T: QuestRepository>(
-    quest_repository: T,
-) -> Router {
+fn create_app<T: QuestRepository>(quest_repository: T) -> Router {
     Router::new()
         .route("/", get(root))
-        .route(
-            "/quests",
-            post(create_quest::<T>)
-                .get(all_quests::<T>)
-        )
+        .route("/quests", post(create_quest::<T>).get(all_quests::<T>))
         .route(
             "/quests/:id",
             get(find_quest::<T>)
                 .patch(update_quest::<T>)
-                .delete(delete_quest::<T>)
+                .delete(delete_quest::<T>),
         )
         .layer(Extension(Arc::new(quest_repository)))
 }
@@ -59,13 +58,14 @@ mod test {
 
     use axum::{
         body::Body,
-        http::{header, Method, Request}, response::Response,
+        http::{header, Method, Request},
+        response::Response,
     };
     use hyper::{self, StatusCode};
     use nanoid::nanoid;
     use tower::ServiceExt;
 
-    use crate::repositories::quest::{Quest, QuestRepositoryForMemory, Difficulty, CreateQuest};
+    use crate::repositories::quest::{CreateQuest, Difficulty, Quest, QuestRepositoryForMemory};
 
     fn build_req_with_empty(path: &str, method: Method) -> Request<Body> {
         Request::builder()
@@ -95,9 +95,10 @@ mod test {
     #[tokio::test]
     async fn should_return_hello_world() {
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = create_app(
-            QuestRepositoryForMemory::new(),
-        ).oneshot(req).await.unwrap();
+        let res = create_app(QuestRepositoryForMemory::new())
+            .oneshot(req)
+            .await
+            .unwrap();
 
         let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
         let body = String::from_utf8(bytes.to_vec()).unwrap();
@@ -114,7 +115,7 @@ mod test {
             0,
             Difficulty::Normal,
             12345,
-            123
+            123,
         );
 
         let req = build_req_with_json(
@@ -127,11 +128,13 @@ mod test {
                 "difficulty": "Normal",
                 "num_participate": 12345,
                 "num_clear": 123
-             }"#.to_string(),
+             }"#
+            .to_string(),
         );
-        let res = create_app(
-            QuestRepositoryForMemory::new(),
-        ).oneshot(req).await.unwrap();
+        let res = create_app(QuestRepositoryForMemory::new())
+            .oneshot(req)
+            .await
+            .unwrap();
         let quest = res_to_quest(res).await;
 
         // idは異なる
@@ -147,7 +150,7 @@ mod test {
             0,
             Difficulty::Normal,
             12345,
-            123
+            123,
         );
 
         let repository = QuestRepositoryForMemory::new();
@@ -158,17 +161,14 @@ mod test {
                 0,
                 Difficulty::Normal,
                 12345,
-                123
+                123,
             ))
             .await
             .expect("failed to create quest");
 
         let req_path = format!("{}{}", "/quests/", created_quest.id);
         let req = build_req_with_empty(&req_path, Method::GET);
-        let res = create_app(repository)
-            .oneshot(req)
-            .await
-            .unwrap();
+        let res = create_app(repository).oneshot(req).await.unwrap();
         let quest = res_to_quest(res).await;
 
         assert_eq!(expected, quest);
@@ -183,7 +183,7 @@ mod test {
             0,
             Difficulty::Normal,
             12345,
-            123
+            123,
         );
 
         let repository = QuestRepositoryForMemory::new();
@@ -194,16 +194,13 @@ mod test {
                 0,
                 Difficulty::Normal,
                 12345,
-                123
+                123,
             ))
             .await
             .expect("failed to create quest");
 
         let req = build_req_with_empty("/quests", Method::GET);
-        let res = create_app(repository)
-            .oneshot(req)
-            .await
-            .unwrap();
+        let res = create_app(repository).oneshot(req).await.unwrap();
         let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
         let body: String = String::from_utf8(bytes.to_vec()).unwrap();
         let quests: Vec<Quest> = serde_json::from_str(&body)
@@ -220,7 +217,7 @@ mod test {
             0,
             Difficulty::Normal,
             12345,
-            123
+            123,
         );
 
         let repository = QuestRepositoryForMemory::new();
@@ -231,7 +228,7 @@ mod test {
                 0,
                 Difficulty::Normal,
                 12345,
-                123
+                123,
             ))
             .await
             .expect("failed to create quest");
@@ -243,12 +240,10 @@ mod test {
             r#"{
                 "title": "Test Update Quests",
                 "description": "This is a test of updating a quest."
-             }"#.to_string(),
+             }"#
+            .to_string(),
         );
-        let res = create_app(repository)
-            .oneshot(req)
-            .await
-            .unwrap();
+        let res = create_app(repository).oneshot(req).await.unwrap();
         let quest = res_to_quest(res).await;
 
         assert_eq!(expected, quest);
@@ -264,17 +259,14 @@ mod test {
                 0,
                 Difficulty::Normal,
                 12345,
-                123
+                123,
             ))
             .await
             .expect("failed to create quest");
 
         let req_path = format!("{}{}", "/quests/", created_quest.id);
         let req = build_req_with_empty(&req_path, Method::DELETE);
-        let res = create_app(repository)
-            .oneshot(req)
-            .await
-            .unwrap();
+        let res = create_app(repository).oneshot(req).await.unwrap();
 
         assert_eq!(StatusCode::NO_CONTENT, res.status());
     }
