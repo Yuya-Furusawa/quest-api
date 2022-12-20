@@ -1,0 +1,14 @@
+CREATE TABLE users
+(
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL,
+    email TEXT NOT NULL,
+    password TEXT NOT NULL
+);
+
+CREATE TABLE user_quests
+(
+    id SERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users (id) DEFERRABLE INITIALLY DEFERRED,
+    quest_id TEXT NOT NULL REFERENCES quests (id) DEFERRABLE INITIALLY DEFERRED
+);
