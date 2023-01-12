@@ -16,7 +16,7 @@ use crate::handlers::{
 };
 use crate::repositories::{
     quest::{QuestRepository, QuestRepositoryForDb},
-    user::{UserRepository, UserRepositoryForMemory},
+    user::{UserRepository, UserRepositoryForDb},
 };
 
 #[tokio::main]
@@ -31,7 +31,7 @@ async fn main() {
 
     let app = create_app(
         QuestRepositoryForDb::new(pool.clone()),
-        UserRepositoryForMemory::new(),
+        UserRepositoryForDb::new(pool.clone()),
     );
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
@@ -81,7 +81,10 @@ mod test {
     use nanoid::nanoid;
     use tower::ServiceExt;
 
-    use crate::repositories::quest::{CreateQuest, Difficulty, Quest, QuestRepositoryForMemory};
+    use crate::repositories::{
+        quest::{CreateQuest, Difficulty, Quest, QuestRepositoryForMemory},
+        user::{UserRepositoryForMemory}
+    };
 
     fn build_req_with_empty(path: &str, method: Method) -> Request<Body> {
         Request::builder()

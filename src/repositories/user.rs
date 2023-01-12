@@ -92,7 +92,7 @@ impl UserRepository for UserRepositoryForDb {
 
         let user = UserEntity {
             id: user_row.id.clone(),
-            username: user_row.id.clone(),
+            username: user_row.username.clone(),
             email: user_row.email.clone(),
             password: user_row.password.clone(),
             participate_quest: quests,
@@ -141,7 +141,7 @@ impl UserRepository for UserRepositoryForDb {
 
         let user = UserEntity {
             id: user_row.id.clone(),
-            username: user_row.id.clone(),
+            username: user_row.username.clone(),
             email: user_row.email.clone(),
             password: user_row.password.clone(),
             participate_quest: quests,
