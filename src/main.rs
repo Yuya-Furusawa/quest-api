@@ -83,7 +83,7 @@ mod test {
 
     use crate::repositories::{
         quest::{CreateQuest, Difficulty, Quest, QuestRepositoryForMemory},
-        user::{UserRepositoryForMemory}
+        user::{RegisterUser, UserEntity, UserRepositoryForMemory},
     };
 
     fn build_req_with_empty(path: &str, method: Method) -> Request<Body> {
@@ -109,6 +109,14 @@ mod test {
         let quest: Quest = serde_json::from_str(&body)
             .expect(&format!("cannot convert Quest instance. body: {}", body));
         quest
+    }
+
+    async fn res_to_user(res: Response) -> UserEntity {
+        let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
+        let body = String::from_utf8(bytes.to_vec()).unwrap();
+        let user: UserEntity = serde_json::from_str(&body)
+            .expect(&format!("cannot convert User instance. body: {}", body));
+        user
     }
 
     #[tokio::test]
@@ -303,6 +311,120 @@ mod test {
             .expect("failed to create quest");
 
         let req_path = format!("{}{}", "/quests/", created_quest.id);
+        let req = build_req_with_empty(&req_path, Method::DELETE);
+        let res = create_app(quest_repository, user_repository)
+            .oneshot(req)
+            .await
+            .unwrap();
+
+        assert_eq!(StatusCode::NO_CONTENT, res.status());
+    }
+
+    #[tokio::test]
+    async fn should_register_user() {
+        let expected = UserEntity::new(
+            nanoid!(),
+            "Test User".to_string(),
+            "test@test.com".to_string(),
+            "password".to_string(),
+        );
+
+        let req = build_req_with_json(
+            "/register",
+            Method::POST,
+            r#"{
+                "username": "Test User",
+                "email": "test@test.com",
+                "password": "password"
+            }"#
+            .to_string(),
+        );
+
+        let res = create_app(
+            QuestRepositoryForMemory::new(),
+            UserRepositoryForMemory::new(),
+        )
+        .oneshot(req)
+        .await
+        .expect("failed to register user");
+        let user = res_to_user(res).await;
+
+        assert_eq!(expected, user);
+    }
+
+    #[tokio::test]
+    async fn should_login_user() {
+        let quest_repository = QuestRepositoryForMemory::new();
+        let user_repository = UserRepositoryForMemory::new();
+
+        let created_user = user_repository
+            .register(RegisterUser::new(
+                "Test User".to_string(),
+                "test@test.com".to_string(),
+                "password".to_string(),
+            ))
+            .await
+            .expect("failed to create user");
+
+        let req = build_req_with_json(
+            "/login",
+            Method::GET,
+            r#"{
+                "username": "Test User",
+                "password": "password"
+            }"#
+            .to_string(),
+        );
+
+        let res = create_app(quest_repository, user_repository)
+            .oneshot(req)
+            .await
+            .expect("failed to login user");
+        let user = res_to_user(res).await;
+
+        assert_eq!(created_user, user);
+    }
+
+    #[tokio::test]
+    async fn should_find_user() {
+        let quest_repository = QuestRepositoryForMemory::new();
+        let user_repository = UserRepositoryForMemory::new();
+
+        let created_user = user_repository
+            .register(RegisterUser::new(
+                "Test User".to_string(),
+                "test@test.com".to_string(),
+                "password".to_string(),
+            ))
+            .await
+            .expect("failed to create user");
+
+        let req_path = format!("{}{}", "/users/", created_user.id);
+        let req = build_req_with_empty(&req_path, Method::GET);
+        let res = create_app(quest_repository, user_repository)
+            .oneshot(req)
+            .await
+            .expect("failed to find user");
+        let user = res_to_user(res).await;
+
+        assert_eq!(created_user, user);
+    }
+
+    #[tokio::test]
+    async fn should_delete_user() {
+        let quest_repository = QuestRepositoryForMemory::new();
+        let user_repository = UserRepositoryForMemory::new();
+
+        let creared_user = user_repository
+            .register(RegisterUser::new(
+                "Test User".to_string(),
+                "test@test.com".to_string(),
+                "password".to_string(),
+            ))
+            .await
+            .expect("failed to create user");
+
+        let req_path = format!("{}{}", "/users/", creared_user.id);
         let req = build_req_with_empty(&req_path, Method::DELETE);
         let res = create_app(quest_repository, user_repository)
             .oneshot(req)

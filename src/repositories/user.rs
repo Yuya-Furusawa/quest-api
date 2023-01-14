@@ -267,7 +267,7 @@ struct UserWithQuestFromRow {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct UserEntity {
-    id: String,
+    pub id: String,
     username: String,
     email: String,
     password: String,
@@ -275,7 +275,7 @@ pub struct UserEntity {
 }
 
 impl UserEntity {
-    fn new(id: String, username: String, email: String, password: String) -> Self {
+    pub fn new(id: String, username: String, email: String, password: String) -> Self {
         Self {
             id,
             username,
@@ -286,11 +286,31 @@ impl UserEntity {
     }
 }
 
+// usernameとemailとpasswordが一致したときは==とみなす
+// idと参加クエストが違っても同じユーザー
+impl PartialEq for UserEntity {
+    fn eq(&self, other: &UserEntity) -> bool {
+        (self.username == other.username)
+            && (self.email == other.email)
+            && (self.password == other.password)
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RegisterUser {
     username: String,
     email: String,
     password: String,
+}
+
+impl RegisterUser {
+    pub fn new(username: String, email: String, password: String) -> Self {
+        Self {
+            username,
+            email,
+            password,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
