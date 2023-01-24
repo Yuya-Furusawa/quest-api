@@ -7,7 +7,10 @@ use axum::{
     Json,
 };
 
-use crate::repositories::user::{LoginUser, RegisterUser, UserRepository};
+use crate::repositories::{
+    quest::QuestRepository,
+    user::{LoginUser, ParticipateQuest, RegisterUser, UserRepository},
+};
 
 pub async fn register_user<T: UserRepository>(
     Json(payload): Json<RegisterUser>,
@@ -51,4 +54,29 @@ pub async fn delete_user<T: UserRepository>(
         .await
         .map(|_| StatusCode::NO_CONTENT)
         .unwrap_or(StatusCode::NOT_FOUND)
+}
+
+pub async fn participate_quest<T: UserRepository, U: QuestRepository>(
+    Json(payload): Json<ParticipateQuest>,
+    Extension(user_repository): Extension<Arc<T>>,
+    Extension(quest_repository): Extension<Arc<U>>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let user = user_repository
+        .find(payload.user_id)
+        .await
+        .or(Err(StatusCode::NOT_FOUND))?;
+    let quest = quest_repository
+        .find(payload.quest_id)
+        .await
+        .or(Err(StatusCode::NOT_FOUND))?;
+
+    println!("{:?}", user);
+    println!("{:?}", quest);
+
+    let updated_user = user_repository
+        .participate_quest(user, quest)
+        .await
+        .or(Err(StatusCode::NOT_FOUND))?;
+
+    Ok((StatusCode::CREATED, Json(updated_user)))
 }

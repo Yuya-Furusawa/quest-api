@@ -12,7 +12,7 @@ use std::{env, net::SocketAddr, sync::Arc};
 
 use crate::handlers::{
     quest::{all_quests, create_quest, delete_quest, find_quest, update_quest},
-    user::{delete_user, find_user, login_user, register_user},
+    user::{delete_user, find_user, login_user, participate_quest, register_user},
 };
 use crate::repositories::{
     quest::{QuestRepository, QuestRepositoryForDb},
@@ -60,6 +60,7 @@ fn create_app<T: QuestRepository, S: UserRepository>(
         .route("/register", post(register_user::<S>))
         .route("/login", get(login_user::<S>))
         .route("/users/:id", get(find_user::<S>).delete(delete_user::<S>))
+        .route("/participate", post(participate_quest::<S, T>))
         .layer(Extension(Arc::new(quest_repository)))
         .layer(Extension(Arc::new(user_repository)))
 }
@@ -432,5 +433,68 @@ mod test {
             .unwrap();
 
         assert_eq!(StatusCode::NO_CONTENT, res.status());
+    }
+
+    #[tokio::test]
+    async fn should_participate_quest() {
+        let quest_repository = QuestRepositoryForMemory::new();
+        let user_repository = UserRepositoryForMemory::new();
+
+        let expected = UserEntity {
+            id: "expected".to_string(),
+            username: "Test User".to_string(),
+            email: "test@test.com".to_string(),
+            password: "password".to_string(),
+            participate_quest: vec![Quest {
+                id: "expected".to_string(),
+                title: "Test Participate Quest".to_string(),
+                description: "This is a test of participating a quest.".to_string(),
+                price: 0,
+                difficulty: Difficulty::Normal,
+                num_participate: 12345,
+                num_clear: 123,
+            }],
+        };
+
+        let created_user = user_repository
+            .register(RegisterUser::new(
+                "Test User".to_string(),
+                "test@test.com".to_string(),
+                "password".to_string(),
+            ))
+            .await
+            .expect("failed to create user");
+
+        let created_quest = quest_repository
+            .create(CreateQuest::new(
+                "Test Participate Quest".to_string(),
+                "This is a test of participating a quest.".to_string(),
+                0,
+                Difficulty::Normal,
+                12345,
+                123,
+            ))
+            .await
+            .expect("failed to create quest");
+
+        let req = build_req_with_json(
+            "/participate",
+            Method::POST,
+            format!(
+                r#"{{
+                "user_id": "{}",
+                "quest_id": "{}"
+            }}"#,
+                created_user.id, created_quest.id
+            ),
+        );
+
+        let res = create_app(quest_repository, user_repository)
+            .oneshot(req)
+            .await
+            .unwrap();
+        let user = res_to_user(res).await;
+
+        assert_eq!(expected, user)
     }
 }
