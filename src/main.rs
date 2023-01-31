@@ -7,8 +7,11 @@ use axum::{
     Router,
 };
 use dotenv::dotenv;
+use http::HeaderValue;
+use hyper::header::CONTENT_TYPE;
 use sqlx::PgPool;
 use std::{env, net::SocketAddr, sync::Arc};
+use tower_http::cors::{Any, CorsLayer};
 
 use crate::handlers::{
     quest::{all_quests, create_quest, delete_quest, find_quest, update_quest},
@@ -63,6 +66,12 @@ fn create_app<T: QuestRepository, S: UserRepository>(
         .route("/participate", post(participate_quest::<S, T>))
         .layer(Extension(Arc::new(quest_repository)))
         .layer(Extension(Arc::new(user_repository)))
+        .layer(
+            CorsLayer::new()
+                .allow_origin("http://localhost:5173".parse::<HeaderValue>().unwrap())
+                .allow_methods(Any)
+                .allow_headers(vec![CONTENT_TYPE]),
+        )
 }
 
 async fn root() -> &'static str {
