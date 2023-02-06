@@ -61,7 +61,7 @@ fn create_app<T: QuestRepository, S: UserRepository>(
                 .delete(delete_quest::<T>),
         )
         .route("/register", post(register_user::<S>))
-        .route("/login", get(login_user::<S>))
+        .route("/login", post(login_user::<S>))
         .route("/users/:id", get(find_user::<S>).delete(delete_user::<S>))
         .route("/participate", post(participate_quest::<S, T>))
         .layer(Extension(Arc::new(quest_repository)))
