@@ -70,9 +70,6 @@ pub async fn participate_quest<T: UserRepository, U: QuestRepository>(
         .await
         .or(Err(StatusCode::NOT_FOUND))?;
 
-    println!("{:?}", user);
-    println!("{:?}", quest);
-
     let updated_user = user_repository
         .participate_quest(user, quest)
         .await
