@@ -7,7 +7,9 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.66"
-axum = "0.5.17"
+async-session = "3.0.0"
+async-sqlx-session = { version = "0.4.0", features = ["pg", "async_std"] }
+axum = { version = "0.5.17", features = ["headers"] }
 dotenv = "0.15.0"
 http = "0.2.8"
 hyper = "0.14.23"
