@@ -1,5 +1,6 @@
 mod handlers;
 mod repositories;
+mod services;
 
 use axum::{
     extract::Extension,

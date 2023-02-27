@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Extension, Path},
-    http::StatusCode,
+    http::{header, StatusCode},
     response::IntoResponse,
     Json,
 };
@@ -11,6 +11,7 @@ use crate::repositories::{
     quest::QuestRepository,
     user::{LoginUser, ParticipateQuest, RegisterUser, UserRepository},
 };
+use crate::services::user::create_session;
 
 pub async fn register_user<T: UserRepository>(
     Json(payload): Json<RegisterUser>,
@@ -20,8 +21,13 @@ pub async fn register_user<T: UserRepository>(
         .register(payload)
         .await
         .or(Err(StatusCode::NOT_FOUND))?;
+    let session_token = create_session(&user).await;
 
-    Ok((StatusCode::CREATED, Json(user)))
+    Ok((
+        StatusCode::CREATED,
+        [(header::SET_COOKIE, session_token.cookie())],
+        Json(user),
+    ))
 }
 
 pub async fn login_user<T: UserRepository>(
@@ -32,8 +38,13 @@ pub async fn login_user<T: UserRepository>(
         .login(payload)
         .await
         .or(Err(StatusCode::NOT_FOUND))?;
+    let session_token = create_session(&user).await;
 
-    Ok((StatusCode::CREATED, Json(user)))
+    Ok((
+        StatusCode::CREATED,
+        [(header::SET_COOKIE, session_token.cookie())],
+        Json(user),
+    ))
 }
 
 pub async fn find_user<T: UserRepository>(
