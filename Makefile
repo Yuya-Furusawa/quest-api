@@ -8,7 +8,7 @@ db:
 
 dev:
 	sqlx db create --database-url $(DATABASE_URL)
-	sqlx migrate run
+	sqlx migrate run --ignore-missing
 	cargo watch -x run
 
 test:
