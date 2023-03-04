@@ -9,11 +9,11 @@ use axum::{
     Router,
 };
 use dotenv::dotenv;
-use http::HeaderValue;
+use http::{HeaderValue, Method};
 use hyper::header::CONTENT_TYPE;
 use sqlx::PgPool;
 use std::{env, net::SocketAddr, sync::Arc};
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 
 use crate::handlers::{
     quest::{all_quests, create_quest, delete_quest, find_quest, update_quest},
@@ -71,7 +71,8 @@ fn create_app<T: QuestRepository, S: UserRepository>(
         .layer(
             CorsLayer::new()
                 .allow_origin("http://localhost:5173".parse::<HeaderValue>().unwrap())
-                .allow_methods(Any)
+                .allow_credentials(true)
+                .allow_methods([Method::GET, Method::POST])
                 .allow_headers(vec![CONTENT_TYPE]),
         )
 }
