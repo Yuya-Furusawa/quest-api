@@ -17,7 +17,7 @@ use tower_http::cors::CorsLayer;
 
 use crate::handlers::{
     quest::{all_quests, create_quest, delete_quest, find_quest, update_quest},
-    user::{delete_user, find_user, login_user, participate_quest, register_user},
+    user::{auth_user, delete_user, find_user, login_user, participate_quest, register_user},
 };
 use crate::repositories::{
     quest::{QuestRepository, QuestRepositoryForDb},
@@ -66,6 +66,7 @@ fn create_app<T: QuestRepository, S: UserRepository>(
         .route("/login", post(login_user::<S>))
         .route("/users/:id", get(find_user::<S>).delete(delete_user::<S>))
         .route("/participate", post(participate_quest::<S, T>))
+        .route("/user/auth", get(auth_user::<S>))
         .layer(Extension(Arc::new(quest_repository)))
         .layer(Extension(Arc::new(user_repository)))
         .layer(

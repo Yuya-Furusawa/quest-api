@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Extension, Path},
+    headers::Cookie,
     http::{header, StatusCode},
     response::IntoResponse,
-    Json,
+    Json, TypedHeader,
 };
 
 use crate::repositories::{
@@ -87,4 +88,20 @@ pub async fn participate_quest<T: UserRepository, U: QuestRepository>(
         .or(Err(StatusCode::NOT_FOUND))?;
 
     Ok((StatusCode::CREATED, Json(updated_user)))
+}
+
+pub async fn auth_user<T: UserRepository>(
+    TypedHeader(cookie): TypedHeader<Cookie>,
+    Extension(user_repository): Extension<Arc<T>>,
+) -> Result<impl IntoResponse, StatusCode> {
+    // セッションidがあるときはJSON形式のuserを返す
+    if let Some(session_id) = cookie.get("session_id") {
+        let user = user_repository
+            .find(session_id.to_string())
+            .await
+            .or(Err(StatusCode::NOT_FOUND))?;
+        return Ok((StatusCode::OK, Json(user)));
+    }
+    // セッションidが無かったときはからの文字列を返す
+    return Err(StatusCode::NOT_FOUND);
 }
