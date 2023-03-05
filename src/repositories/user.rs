@@ -56,10 +56,10 @@ impl UserRepository for UserRepositoryForDb {
     async fn login(&self, payload: LoginUser) -> anyhow::Result<UserEntity> {
         let user_row = sqlx::query_as::<_, UserFromRow>(
             r#"
-                select * from users where username=$1 and password=$2;
+                select * from users where email=$1 and password=$2;
             "#,
         )
-        .bind(payload.username)
+        .bind(payload.email)
         .bind(payload.password)
         .fetch_one(&self.pool)
         .await?;
@@ -244,7 +244,7 @@ impl UserRepository for UserRepositoryForMemory {
         let user_vec = store
             .values()
             .filter(|user| {
-                (**user).username == payload.username && (**user).password == payload.password
+                (**user).email == payload.email && (**user).password == payload.password
             })
             .map(|user| user.clone())
             .collect::<Vec<UserEntity>>();
@@ -358,7 +358,7 @@ impl RegisterUser {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LoginUser {
-    username: String,
+    email: String,
     password: String,
 }
 
