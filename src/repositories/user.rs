@@ -1,5 +1,6 @@
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use axum::async_trait;
+use bcrypt::{hash, verify, DEFAULT_COST};
 use nanoid::nanoid;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
@@ -35,6 +36,7 @@ impl UserRepositoryForDb {
 #[async_trait]
 impl UserRepository for UserRepositoryForDb {
     async fn register(&self, payload: RegisterUser) -> anyhow::Result<UserEntity> {
+        let hashed_password = hash(payload.password, DEFAULT_COST)?;
         let row = sqlx::query_as::<_, UserFromRow>(
             r#"
                 insert into users values ($1, $2, $3, $4)
@@ -44,7 +46,7 @@ impl UserRepository for UserRepositoryForDb {
         .bind(nanoid!())
         .bind(payload.username)
         .bind(payload.email)
-        .bind(payload.password)
+        .bind(hashed_password)
         .fetch_one(&self.pool)
         .await?;
 
@@ -56,13 +58,17 @@ impl UserRepository for UserRepositoryForDb {
     async fn login(&self, payload: LoginUser) -> anyhow::Result<UserEntity> {
         let user_row = sqlx::query_as::<_, UserFromRow>(
             r#"
-                select * from users where email=$1 and password=$2;
+                select * from users where email=$1;
             "#,
         )
         .bind(payload.email)
-        .bind(payload.password)
         .fetch_one(&self.pool)
         .await?;
+
+        let verified = verify(payload.password, &user_row.password)?;
+        if !verified {
+            return Err(anyhow!("Invalid Password"));
+        }
 
         let user_quest = sqlx::query_as::<_, UserWithQuestFromRow>(
             r#"
@@ -243,9 +249,7 @@ impl UserRepository for UserRepositoryForMemory {
         let store = self.read_store_ref();
         let user_vec = store
             .values()
-            .filter(|user| {
-                (**user).email == payload.email && (**user).password == payload.password
-            })
+            .filter(|user| (**user).email == payload.email && (**user).password == payload.password)
             .map(|user| user.clone())
             .collect::<Vec<UserEntity>>();
         let user = user_vec.get(0).unwrap();
