@@ -15,10 +15,12 @@ use std::{env, net::SocketAddr, sync::Arc};
 use tower_http::cors::CorsLayer;
 
 use crate::handlers::{
+    challenge::{create_challenge, find_challenge},
     quest::{all_quests, create_quest, delete_quest, find_quest, update_quest},
     user::{auth_user, delete_user, find_user, login_user, participate_quest, register_user},
 };
 use crate::repositories::{
+    challenge::{ChallengeRepository, ChallengeRepositoryForDb},
     quest::{QuestRepository, QuestRepositoryForDb},
     user::{UserRepository, UserRepositoryForDb},
 };
@@ -36,6 +38,7 @@ async fn main() {
     let app = create_app(
         QuestRepositoryForDb::new(pool.clone()),
         UserRepositoryForDb::new(pool.clone()),
+        ChallengeRepositoryForDb::new(pool.clone()),
     );
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
@@ -48,9 +51,10 @@ async fn main() {
         .unwrap();
 }
 
-fn create_app<T: QuestRepository, S: UserRepository>(
+fn create_app<T: QuestRepository, S: UserRepository, U: ChallengeRepository>(
     quest_repository: T,
     user_repository: S,
+    challenge_repository: U,
 ) -> Router {
     Router::new()
         .route("/", get(root))
@@ -66,8 +70,11 @@ fn create_app<T: QuestRepository, S: UserRepository>(
         .route("/users/:id", get(find_user::<S>).delete(delete_user::<S>))
         .route("/participate", post(participate_quest::<S, T>))
         .route("/user/auth", get(auth_user::<S>))
+        .route("/challenges", post(create_challenge::<U>))
+        .route("/challenges/:id", get(find_challenge::<U>))
         .layer(Extension(Arc::new(quest_repository)))
         .layer(Extension(Arc::new(user_repository)))
+        .layer(Extension(Arc::new(challenge_repository)))
         .layer(
             CorsLayer::new()
                 .allow_origin("http://localhost:5173".parse::<HeaderValue>().unwrap())
@@ -95,6 +102,7 @@ mod test {
     use tower::ServiceExt;
 
     use crate::repositories::{
+        challenge::ChallengeRepositoryForMemory,
         quest::{CreateQuest, Difficulty, Quest, QuestRepositoryForMemory},
         user::{RegisterUser, UserEntity, UserRepositoryForMemory},
     };
@@ -138,6 +146,7 @@ mod test {
         let res = create_app(
             QuestRepositoryForMemory::new(),
             UserRepositoryForMemory::new(),
+            ChallengeRepositoryForMemory::new(),
         )
         .oneshot(req)
         .await
@@ -177,6 +186,7 @@ mod test {
         let res = create_app(
             QuestRepositoryForMemory::new(),
             UserRepositoryForMemory::new(),
+            ChallengeRepositoryForMemory::new(),
         )
         .oneshot(req)
         .await
@@ -201,6 +211,7 @@ mod test {
 
         let quest_repository = QuestRepositoryForMemory::new();
         let user_repository = UserRepositoryForMemory::new();
+        let challenge_repository = ChallengeRepositoryForMemory::new();
         let created_quest = quest_repository
             .create(CreateQuest::new(
                 "Test Find Quest".to_string(),
@@ -215,7 +226,7 @@ mod test {
 
         let req_path = format!("{}{}", "/quests/", created_quest.id);
         let req = build_req_with_empty(&req_path, Method::GET);
-        let res = create_app(quest_repository, user_repository)
+        let res = create_app(quest_repository, user_repository, challenge_repository)
             .oneshot(req)
             .await
             .unwrap();
@@ -238,6 +249,7 @@ mod test {
 
         let quest_repository = QuestRepositoryForMemory::new();
         let user_repository = UserRepositoryForMemory::new();
+        let challnege_repository = ChallengeRepositoryForMemory::new();
         quest_repository
             .create(CreateQuest::new(
                 "Test All Quests".to_string(),
@@ -251,7 +263,7 @@ mod test {
             .expect("failed to create quest");
 
         let req = build_req_with_empty("/quests", Method::GET);
-        let res = create_app(quest_repository, user_repository)
+        let res = create_app(quest_repository, user_repository, challnege_repository)
             .oneshot(req)
             .await
             .unwrap();
@@ -276,6 +288,7 @@ mod test {
 
         let quest_repository = QuestRepositoryForMemory::new();
         let user_repository = UserRepositoryForMemory::new();
+        let challenge_repository = ChallengeRepositoryForMemory::new();
         let created_quest = quest_repository
             .create(CreateQuest::new(
                 "Test Update Quests Before".to_string(),
@@ -298,7 +311,7 @@ mod test {
              }"#
             .to_string(),
         );
-        let res = create_app(quest_repository, user_repository)
+        let res = create_app(quest_repository, user_repository, challenge_repository)
             .oneshot(req)
             .await
             .unwrap();
@@ -311,6 +324,7 @@ mod test {
     async fn should_delete_quest() {
         let quest_repository = QuestRepositoryForMemory::new();
         let user_repository = UserRepositoryForMemory::new();
+        let challenge_repository = ChallengeRepositoryForMemory::new();
         let created_quest = quest_repository
             .create(CreateQuest::new(
                 "Test Delete Quests".to_string(),
@@ -325,7 +339,7 @@ mod test {
 
         let req_path = format!("{}{}", "/quests/", created_quest.id);
         let req = build_req_with_empty(&req_path, Method::DELETE);
-        let res = create_app(quest_repository, user_repository)
+        let res = create_app(quest_repository, user_repository, challenge_repository)
             .oneshot(req)
             .await
             .unwrap();
@@ -356,6 +370,7 @@ mod test {
         let res = create_app(
             QuestRepositoryForMemory::new(),
             UserRepositoryForMemory::new(),
+            ChallengeRepositoryForMemory::new(),
         )
         .oneshot(req)
         .await
@@ -369,6 +384,7 @@ mod test {
     async fn should_login_user() {
         let quest_repository = QuestRepositoryForMemory::new();
         let user_repository = UserRepositoryForMemory::new();
+        let challenge_repository = ChallengeRepositoryForMemory::new();
 
         let created_user = user_repository
             .register(RegisterUser::new(
@@ -389,7 +405,7 @@ mod test {
             .to_string(),
         );
 
-        let res = create_app(quest_repository, user_repository)
+        let res = create_app(quest_repository, user_repository, challenge_repository)
             .oneshot(req)
             .await
             .expect("failed to login user");
@@ -402,6 +418,7 @@ mod test {
     async fn should_find_user() {
         let quest_repository = QuestRepositoryForMemory::new();
         let user_repository = UserRepositoryForMemory::new();
+        let challenge_repository = ChallengeRepositoryForMemory::new();
 
         let created_user = user_repository
             .register(RegisterUser::new(
@@ -414,7 +431,7 @@ mod test {
 
         let req_path = format!("{}{}", "/users/", created_user.id);
         let req = build_req_with_empty(&req_path, Method::GET);
-        let res = create_app(quest_repository, user_repository)
+        let res = create_app(quest_repository, user_repository, challenge_repository)
             .oneshot(req)
             .await
             .expect("failed to find user");
@@ -427,6 +444,7 @@ mod test {
     async fn should_delete_user() {
         let quest_repository = QuestRepositoryForMemory::new();
         let user_repository = UserRepositoryForMemory::new();
+        let challenge_repository = ChallengeRepositoryForMemory::new();
 
         let creared_user = user_repository
             .register(RegisterUser::new(
@@ -439,7 +457,7 @@ mod test {
 
         let req_path = format!("{}{}", "/users/", creared_user.id);
         let req = build_req_with_empty(&req_path, Method::DELETE);
-        let res = create_app(quest_repository, user_repository)
+        let res = create_app(quest_repository, user_repository, challenge_repository)
             .oneshot(req)
             .await
             .unwrap();
@@ -451,6 +469,7 @@ mod test {
     async fn should_participate_quest() {
         let quest_repository = QuestRepositoryForMemory::new();
         let user_repository = UserRepositoryForMemory::new();
+        let challenge_repository = ChallengeRepositoryForMemory::new();
 
         let expected = UserEntity {
             id: "expected".to_string(),
@@ -501,7 +520,7 @@ mod test {
             ),
         );
 
-        let res = create_app(quest_repository, user_repository)
+        let res = create_app(quest_repository, user_repository, challenge_repository)
             .oneshot(req)
             .await
             .unwrap();
