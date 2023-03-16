@@ -10,7 +10,7 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
-use crate::repositories::quest::{Difficulty, Quest};
+use crate::repositories::quest::{Difficulty, QuestFromRow};
 
 #[async_trait]
 pub trait UserRepository: Clone + std::marker::Send + std::marker::Sync + 'static {
@@ -18,8 +18,11 @@ pub trait UserRepository: Clone + std::marker::Send + std::marker::Sync + 'stati
     async fn login(&self, payload: LoginUser) -> anyhow::Result<UserEntity>;
     async fn find(&self, id: String) -> anyhow::Result<UserEntity>;
     async fn delete(&self, id: String) -> anyhow::Result<()>;
-    async fn participate_quest(&self, user: UserEntity, quest: Quest)
-        -> anyhow::Result<UserEntity>;
+    async fn participate_quest(
+        &self,
+        user: UserEntity,
+        quest: QuestFromRow,
+    ) -> anyhow::Result<UserEntity>;
 }
 
 #[derive(Debug, Clone)]
@@ -85,18 +88,16 @@ impl UserRepository for UserRepositoryForDb {
 
         let quests = user_quest
             .iter()
-            .map(|x| {
-                Quest::new(
-                    x.quest_id.clone(),
-                    x.title.clone(),
-                    x.description.clone(),
-                    x.price.clone(),
-                    x.difficulty.clone(),
-                    x.num_participate.clone(),
-                    x.num_clear.clone(),
-                )
+            .map(|x| QuestFromRow {
+                id: x.quest_id.clone(),
+                title: x.title.clone(),
+                description: x.description.clone(),
+                price: x.price.clone(),
+                difficulty: x.difficulty.clone(),
+                num_participate: x.num_participate.clone(),
+                num_clear: x.num_clear.clone(),
             })
-            .collect::<Vec<Quest>>();
+            .collect::<Vec<QuestFromRow>>();
 
         let user = UserEntity {
             id: user_row.id.clone(),
@@ -134,18 +135,16 @@ impl UserRepository for UserRepositoryForDb {
 
         let quests = user_quest
             .iter()
-            .map(|x| {
-                Quest::new(
-                    x.quest_id.clone(),
-                    x.title.clone(),
-                    x.description.clone(),
-                    x.price.clone(),
-                    x.difficulty.clone(),
-                    x.num_participate.clone(),
-                    x.num_clear.clone(),
-                )
+            .map(|x| QuestFromRow {
+                id: x.quest_id.clone(),
+                title: x.title.clone(),
+                description: x.description.clone(),
+                price: x.price.clone(),
+                difficulty: x.difficulty.clone(),
+                num_participate: x.num_participate.clone(),
+                num_clear: x.num_clear.clone(),
             })
-            .collect::<Vec<Quest>>();
+            .collect::<Vec<QuestFromRow>>();
 
         let user = UserEntity {
             id: user_row.id.clone(),
@@ -189,7 +188,7 @@ impl UserRepository for UserRepositoryForDb {
     async fn participate_quest(
         &self,
         user: UserEntity,
-        quest: Quest,
+        quest: QuestFromRow,
     ) -> anyhow::Result<UserEntity> {
         sqlx::query!(
             r#"
@@ -271,7 +270,7 @@ impl UserRepository for UserRepositoryForMemory {
     async fn participate_quest(
         &self,
         user: UserEntity,
-        quest: Quest,
+        quest: QuestFromRow,
     ) -> anyhow::Result<UserEntity> {
         let mut store = self.write_store_ref();
         let mut participate_quest = user.participate_quest;
@@ -318,7 +317,7 @@ pub struct UserEntity {
     pub username: String,
     pub email: String,
     pub password: String,
-    pub participate_quest: Vec<Quest>,
+    pub participate_quest: Vec<QuestFromRow>,
 }
 
 impl UserEntity {

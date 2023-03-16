@@ -103,7 +103,7 @@ mod test {
 
     use crate::repositories::{
         challenge::ChallengeRepositoryForMemory,
-        quest::{CreateQuest, Difficulty, Quest, QuestRepositoryForMemory},
+        quest::{CreateQuest, Difficulty, QuestEntity, QuestFromRow, QuestRepositoryForMemory},
         user::{RegisterUser, UserEntity, UserRepositoryForMemory},
     };
 
@@ -124,10 +124,10 @@ mod test {
             .unwrap()
     }
 
-    async fn res_to_quest(res: Response) -> Quest {
+    async fn res_to_quest(res: Response) -> QuestEntity {
         let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
         let body = String::from_utf8(bytes.to_vec()).unwrap();
-        let quest: Quest = serde_json::from_str(&body)
+        let quest: QuestEntity = serde_json::from_str(&body)
             .expect(&format!("cannot convert Quest instance. body: {}", body));
         quest
     }
@@ -160,7 +160,7 @@ mod test {
 
     #[tokio::test]
     async fn should_create_quest() {
-        let expected = Quest::new(
+        let expected = QuestEntity::new(
             nanoid!(),
             "Test Create Quest".to_string(),
             "This is a test of creating a quest.".to_string(),
@@ -199,7 +199,7 @@ mod test {
 
     #[tokio::test]
     async fn should_find_quest() {
-        let expected = Quest::new(
+        let expected = QuestEntity::new(
             nanoid!(),
             "Test Find Quest".to_string(),
             "This is a test of finding a quest.".to_string(),
@@ -237,7 +237,7 @@ mod test {
 
     #[tokio::test]
     async fn should_all_quests() {
-        let expected = Quest::new(
+        let expected = QuestEntity::new(
             nanoid!(),
             "Test All Quests".to_string(),
             "This is a test of finding all quests.".to_string(),
@@ -269,14 +269,14 @@ mod test {
             .unwrap();
         let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
         let body: String = String::from_utf8(bytes.to_vec()).unwrap();
-        let quests: Vec<Quest> = serde_json::from_str(&body)
+        let quests: Vec<QuestEntity> = serde_json::from_str(&body)
             .expect(&format!("cannot convert Quest instance. body {}", body));
         assert_eq!(vec![expected], quests);
     }
 
     #[tokio::test]
     async fn should_update_quest() {
-        let expected = Quest::new(
+        let expected = QuestEntity::new(
             nanoid!(),
             "Test Update Quests".to_string(),
             "This is a test of updating a quest.".to_string(),
@@ -476,7 +476,7 @@ mod test {
             username: "Test User".to_string(),
             email: "test@test.com".to_string(),
             password: "password".to_string(),
-            participate_quest: vec![Quest {
+            participate_quest: vec![QuestFromRow {
                 id: "expected".to_string(),
                 title: "Test Participate Quest".to_string(),
                 description: "This is a test of participating a quest.".to_string(),

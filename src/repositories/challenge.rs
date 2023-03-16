@@ -108,7 +108,7 @@ pub struct Challenge {
     id: String,
     name: String,
     description: String,
-    quest_id: String,
+    pub quest_id: String,
 }
 
 impl Challenge {

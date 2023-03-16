@@ -9,12 +9,14 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
+use super::challenge::Challenge;
+
 #[async_trait]
 pub trait QuestRepository: Clone + std::marker::Send + std::marker::Sync + 'static {
-    async fn create(&self, payload: CreateQuest) -> anyhow::Result<Quest>;
-    async fn find(&self, id: String) -> anyhow::Result<Quest>;
-    async fn all(&self) -> anyhow::Result<Vec<Quest>>;
-    async fn update(&self, id: String, payload: UpdateQuest) -> anyhow::Result<Quest>;
+    async fn create(&self, payload: CreateQuest) -> anyhow::Result<QuestEntity>;
+    async fn find(&self, id: String) -> anyhow::Result<QuestEntity>;
+    async fn all(&self) -> anyhow::Result<Vec<QuestEntity>>;
+    async fn update(&self, id: String, payload: UpdateQuest) -> anyhow::Result<QuestEntity>;
     async fn delete(&self, id: String) -> anyhow::Result<()>;
 }
 
@@ -31,8 +33,8 @@ impl QuestRepositoryForDb {
 
 #[async_trait]
 impl QuestRepository for QuestRepositoryForDb {
-    async fn create(&self, payload: CreateQuest) -> anyhow::Result<Quest> {
-        let quest = sqlx::query_as::<_, Quest>(
+    async fn create(&self, payload: CreateQuest) -> anyhow::Result<QuestEntity> {
+        let row = sqlx::query_as::<_, QuestFromRow>(
             r#"
                 insert into quests values ($1, $2, $3, $4, $5, $6, $7)
                 returning *
@@ -48,24 +50,54 @@ impl QuestRepository for QuestRepositoryForDb {
         .fetch_one(&self.pool)
         .await?;
 
+        let quest = QuestEntity::new(
+            row.id,
+            row.title,
+            row.description,
+            row.price,
+            row.difficulty,
+            row.num_participate,
+            row.num_clear,
+        );
+
         Ok(quest)
     }
 
-    async fn find(&self, id: String) -> anyhow::Result<Quest> {
-        let quest = sqlx::query_as::<_, Quest>(
+    async fn find(&self, id: String) -> anyhow::Result<QuestEntity> {
+        let row = sqlx::query_as::<_, QuestFromRow>(
             r#"
                 select * from quests where id = $1;
             "#,
         )
-        .bind(id)
+        .bind(id.clone())
         .fetch_one(&self.pool)
         .await?;
+
+        let challenges = sqlx::query_as::<_, Challenge>(
+            r#"
+                select * from challenges where quest_id = $1;
+            "#,
+        )
+        .bind(id.clone())
+        .fetch_all(&self.pool)
+        .await?;
+
+        let quest = QuestEntity {
+            id: row.id,
+            title: row.title,
+            description: row.description,
+            price: row.price,
+            difficulty: row.difficulty,
+            num_participate: row.num_participate,
+            num_clear: row.num_clear,
+            challenges,
+        };
 
         Ok(quest)
     }
 
-    async fn all(&self) -> anyhow::Result<Vec<Quest>> {
-        let quests = sqlx::query_as::<_, Quest>(
+    async fn all(&self) -> anyhow::Result<Vec<QuestEntity>> {
+        let quest_rows = sqlx::query_as::<_, QuestFromRow>(
             r#"
                 select * from quests;
             "#,
@@ -73,12 +105,41 @@ impl QuestRepository for QuestRepositoryForDb {
         .fetch_all(&self.pool)
         .await?;
 
+        let challenge_rows = sqlx::query_as::<_, Challenge>(
+            r#"
+                select * from challenges;
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut quests = quest_rows
+            .into_iter()
+            .map(|row| {
+                QuestEntity::new(
+                    row.id,
+                    row.title,
+                    row.description,
+                    row.price,
+                    row.difficulty,
+                    row.num_participate,
+                    row.num_clear,
+                )
+            })
+            .collect::<Vec<QuestEntity>>();
+
+        for challenge in challenge_rows {
+            if let Some(quest) = quests.iter_mut().find(|q| q.id == challenge.quest_id) {
+                quest.challenges.push(challenge)
+            }
+        }
+
         Ok(quests)
     }
 
-    async fn update(&self, id: String, payload: UpdateQuest) -> anyhow::Result<Quest> {
+    async fn update(&self, id: String, payload: UpdateQuest) -> anyhow::Result<QuestEntity> {
         let old_quest = self.find(id.clone()).await?;
-        let quest = sqlx::query_as::<_, Quest>(
+        let row = sqlx::query_as::<_, QuestFromRow>(
             r#"
                 update quests set title=$1, description=$2, price=$3, difficulty=$4, num_participate=$5, num_clear=$6
                 where id=$7
@@ -95,6 +156,17 @@ impl QuestRepository for QuestRepositoryForDb {
         .fetch_one(&self.pool)
         .await?;
 
+        let quest = QuestEntity {
+            id: row.id,
+            title: row.title,
+            description: row.description,
+            price: row.price,
+            difficulty: row.difficulty,
+            num_participate: row.num_participate,
+            num_clear: row.num_clear,
+            challenges: old_quest.challenges,
+        };
+
         Ok(quest)
     }
 
@@ -104,7 +176,16 @@ impl QuestRepository for QuestRepositoryForDb {
                 delete from quests where id=$1
             "#,
         )
-        .bind(id)
+        .bind(id.clone())
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+                delete from challenges where quest_id=$1
+            "#,
+        )
+        .bind(id.clone())
         .execute(&self.pool)
         .await?;
 
@@ -113,7 +194,7 @@ impl QuestRepository for QuestRepositoryForDb {
 }
 
 // とりあえず一旦HashMapにデータを保存しておく
-type QuestDatas = HashMap<String, Quest>;
+type QuestDatas = HashMap<String, QuestEntity>;
 
 #[derive(Debug, Clone)]
 pub struct QuestRepositoryForMemory {
@@ -138,10 +219,10 @@ impl QuestRepositoryForMemory {
 
 #[async_trait]
 impl QuestRepository for QuestRepositoryForMemory {
-    async fn create(&self, payload: CreateQuest) -> anyhow::Result<Quest> {
+    async fn create(&self, payload: CreateQuest) -> anyhow::Result<QuestEntity> {
         let mut store = self.write_store_ref();
         let id = nanoid!();
-        let quest = Quest::new(
+        let quest = QuestEntity::new(
             id.clone(),
             payload.title,
             payload.description,
@@ -154,19 +235,19 @@ impl QuestRepository for QuestRepositoryForMemory {
         Ok(quest)
     }
 
-    async fn find(&self, id: String) -> anyhow::Result<Quest> {
+    async fn find(&self, id: String) -> anyhow::Result<QuestEntity> {
         let store = self.read_store_ref();
         let quest = store.get(&id).map(|quest| quest.clone()).unwrap();
         Ok(quest)
     }
 
-    async fn all(&self) -> anyhow::Result<Vec<Quest>> {
+    async fn all(&self) -> anyhow::Result<Vec<QuestEntity>> {
         let store = self.read_store_ref();
         let quests = Vec::from_iter(store.values().cloned());
         Ok(quests)
     }
 
-    async fn update(&self, id: String, payload: UpdateQuest) -> anyhow::Result<Quest> {
+    async fn update(&self, id: String, payload: UpdateQuest) -> anyhow::Result<QuestEntity> {
         let mut store = self.write_store_ref();
         let quest = store.get(&id).context(NotFound)?;
         let title = payload.title.unwrap_or(quest.title.clone());
@@ -177,15 +258,16 @@ impl QuestRepository for QuestRepositoryForMemory {
             .num_participate
             .unwrap_or(quest.num_participate.clone());
         let num_clear = payload.num_clear.unwrap_or(quest.num_clear.clone());
-        let quest = Quest::new(
-            quest.id.clone(),
+        let quest = QuestEntity {
+            id: quest.id.clone(),
             title,
             description,
             price,
             difficulty,
             num_participate,
             num_clear,
-        );
+            challenges: quest.challenges.clone(),
+        };
         store.insert(id, quest.clone());
         Ok(quest)
     }
@@ -230,7 +312,7 @@ impl TryFrom<String> for Difficulty {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct Quest {
+pub struct QuestFromRow {
     pub id: String,
     pub title: String,
     pub description: String,
@@ -239,13 +321,22 @@ pub struct Quest {
     pub difficulty: Difficulty,
     pub num_participate: i32,
     pub num_clear: i32,
-    // prize: String,
-    // rating: u8,
-    // created_at: DateTime<Local>,
-    // milestones: Vec<Milestones>,
 }
 
-impl Quest {
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct QuestEntity {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub price: i32, // 0ならFree
+    #[sqlx(try_from = "String")]
+    pub difficulty: Difficulty,
+    pub num_participate: i32,
+    pub num_clear: i32,
+    pub challenges: Vec<Challenge>,
+}
+
+impl QuestEntity {
     pub fn new(
         id: String,
         title: String,
@@ -263,13 +354,14 @@ impl Quest {
             difficulty,
             num_participate,
             num_clear,
+            challenges: Vec::new(),
         }
     }
 }
 
 // 各fieldが一致したとき==とみなす
-impl PartialEq for Quest {
-    fn eq(&self, other: &Quest) -> bool {
+impl PartialEq for QuestEntity {
+    fn eq(&self, other: &QuestEntity) -> bool {
         (self.title == other.title)
             && (self.description == other.description)
             && (self.price == other.price)

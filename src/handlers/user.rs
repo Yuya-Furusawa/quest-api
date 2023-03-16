@@ -9,7 +9,7 @@ use axum::{
 };
 
 use crate::repositories::{
-    quest::QuestRepository,
+    quest::{QuestFromRow, QuestRepository},
     user::{LoginUser, ParticipateQuest, RegisterUser, UserRepository},
 };
 use crate::services::user::create_session;
@@ -82,8 +82,18 @@ pub async fn participate_quest<T: UserRepository, U: QuestRepository>(
         .await
         .or(Err(StatusCode::NOT_FOUND))?;
 
+    let quest_row = QuestFromRow {
+        id: quest.id,
+        title: quest.title,
+        description: quest.description,
+        price: quest.price,
+        difficulty: quest.difficulty,
+        num_participate: quest.num_participate,
+        num_clear: quest.num_clear,
+    };
+
     let updated_user = user_repository
-        .participate_quest(user, quest)
+        .participate_quest(user, quest_row)
         .await
         .or(Err(StatusCode::NOT_FOUND))?;
 
