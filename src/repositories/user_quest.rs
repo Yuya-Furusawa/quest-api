@@ -87,11 +87,11 @@ impl UserQuestRepository for UserQuestRepositoryForMemory {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, FromRow)]
+#[derive(Debug, Clone, Deserialize, Serialize, FromRow, PartialEq)]
 pub struct ParticipateQuest {
-    id: i32,
-    user_id: String,
-    quest_id: String,
+    pub id: i32,
+    pub user_id: String,
+    pub quest_id: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

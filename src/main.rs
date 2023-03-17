@@ -140,6 +140,7 @@ mod test {
         challenge::ChallengeRepositoryForMemory,
         quest::{CreateQuest, Difficulty, QuestEntity, QuestFromRow, QuestRepositoryForMemory},
         user::{RegisterUser, UserEntity, UserRepositoryForMemory},
+        user_quest::{ParticipateQuest, ParticipateQuestPayload, UserQuestRepositoryForMemory},
     };
 
     fn build_req_with_empty(path: &str, method: Method) -> Request<Body> {
@@ -173,6 +174,16 @@ mod test {
         let user: UserEntity = serde_json::from_str(&body)
             .expect(&format!("cannot convert User instance. body: {}", body));
         user
+    }
+
+    async fn res_to_userquest(res: Response) -> ParticipateQuest {
+        let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
+        let body = String::from_utf8(bytes.to_vec()).unwrap();
+        let userquest: ParticipateQuest = serde_json::from_str(&body).expect(&format!(
+            "cannot convert ParticipateQuest instance. body: {}",
+            body
+        ));
+        userquest
     }
 
     #[tokio::test]
@@ -472,65 +483,29 @@ mod test {
 
     #[tokio::test]
     async fn should_participate_quest() {
-        let quest_repository = QuestRepositoryForMemory::new();
-        let user_repository = UserRepositoryForMemory::new();
-        let challenge_repository = ChallengeRepositoryForMemory::new();
-
-        let expected = UserEntity {
-            id: "expected".to_string(),
-            username: "Test User".to_string(),
-            email: "test@test.com".to_string(),
-            password: "password".to_string(),
-            participate_quest: vec![QuestFromRow {
-                id: "expected".to_string(),
-                title: "Test Participate Quest".to_string(),
-                description: "This is a test of participating a quest.".to_string(),
-                price: 0,
-                difficulty: Difficulty::Normal,
-                num_participate: 12345,
-                num_clear: 123,
-            }],
+        let expected = ParticipateQuest {
+            id: 1,
+            user_id: "test".to_string(),
+            quest_id: "test".to_string(),
         };
-
-        let created_user = user_repository
-            .register(RegisterUser::new(
-                "Test User".to_string(),
-                "test@test.com".to_string(),
-                "password".to_string(),
-            ))
-            .await
-            .expect("failed to create user");
-
-        let created_quest = quest_repository
-            .create(CreateQuest::new(
-                "Test Participate Quest".to_string(),
-                "This is a test of participating a quest.".to_string(),
-                0,
-                Difficulty::Normal,
-                12345,
-                123,
-            ))
-            .await
-            .expect("failed to create quest");
 
         let req = build_req_with_json(
             "/participate",
             Method::POST,
-            format!(
-                r#"{{
-                "user_id": "{}",
-                "quest_id": "{}"
-            }}"#,
-                created_user.id, created_quest.id
-            ),
+            r#"{
+                "user_id": "test",
+                "quest_id": "test"
+            }"#
+            .to_string(),
         );
 
-        let res = create_user_routes(UserRepositoryForMemory::new())
+        let res = create_userquest_routes(UserQuestRepositoryForMemory::new())
             .oneshot(req)
             .await
             .unwrap();
-        let user = res_to_user(res).await;
 
-        assert_eq!(expected, user)
+        let result = res_to_userquest(res).await;
+
+        assert_eq!(expected, result)
     }
 }
