@@ -8,10 +8,7 @@ use axum::{
     Json, TypedHeader,
 };
 
-use crate::repositories::{
-    quest::{QuestFromRow, QuestRepository},
-    user::{LoginUser, ParticipateQuest, RegisterUser, UserRepository},
-};
+use crate::repositories::user::{LoginUser, RegisterUser, UserRepository};
 use crate::services::user::create_session;
 
 pub async fn register_user<T: UserRepository>(
@@ -66,38 +63,6 @@ pub async fn delete_user<T: UserRepository>(
         .await
         .map(|_| StatusCode::NO_CONTENT)
         .unwrap_or(StatusCode::NOT_FOUND)
-}
-
-pub async fn participate_quest<T: UserRepository, U: QuestRepository>(
-    Json(payload): Json<ParticipateQuest>,
-    Extension(user_repository): Extension<Arc<T>>,
-    Extension(quest_repository): Extension<Arc<U>>,
-) -> Result<impl IntoResponse, StatusCode> {
-    let user = user_repository
-        .find(payload.user_id)
-        .await
-        .or(Err(StatusCode::NOT_FOUND))?;
-    let quest = quest_repository
-        .find(payload.quest_id)
-        .await
-        .or(Err(StatusCode::NOT_FOUND))?;
-
-    let quest_row = QuestFromRow {
-        id: quest.id,
-        title: quest.title,
-        description: quest.description,
-        price: quest.price,
-        difficulty: quest.difficulty,
-        num_participate: quest.num_participate,
-        num_clear: quest.num_clear,
-    };
-
-    let updated_user = user_repository
-        .participate_quest(user, quest_row)
-        .await
-        .or(Err(StatusCode::NOT_FOUND))?;
-
-    Ok((StatusCode::CREATED, Json(updated_user)))
 }
 
 pub async fn auth_user<T: UserRepository>(

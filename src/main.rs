@@ -17,12 +17,14 @@ use tower_http::cors::CorsLayer;
 use crate::handlers::{
     challenge::{create_challenge, find_challenge},
     quest::{all_quests, create_quest, delete_quest, find_quest, update_quest},
-    user::{auth_user, delete_user, find_user, login_user, participate_quest, register_user},
+    user::{auth_user, delete_user, find_user, login_user, register_user},
+    user_quest::participate_quest,
 };
 use crate::repositories::{
     challenge::{ChallengeRepository, ChallengeRepositoryForDb},
     quest::{QuestRepository, QuestRepositoryForDb},
     user::{UserRepository, UserRepositoryForDb},
+    user_quest::{UserQuestRepository, UserQuestRepositoryForDb},
 };
 
 #[tokio::main]
@@ -39,6 +41,7 @@ async fn main() {
         QuestRepositoryForDb::new(pool.clone()),
         UserRepositoryForDb::new(pool.clone()),
         ChallengeRepositoryForDb::new(pool.clone()),
+        UserQuestRepositoryForDb::new(pool.clone()),
     );
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
@@ -51,30 +54,28 @@ async fn main() {
         .unwrap();
 }
 
-fn create_app<T: QuestRepository, S: UserRepository, U: ChallengeRepository>(
+fn create_app<
+    T: QuestRepository,
+    S: UserRepository,
+    U: ChallengeRepository,
+    P: UserQuestRepository,
+>(
     quest_repository: T,
     user_repository: S,
     challenge_repository: U,
+    userquest_repository: P,
 ) -> Router {
+    let user_routes = create_user_routes(user_repository);
+    let quest_routes = create_quest_routes(quest_repository);
+    let challenge_routes = create_challenge_routes(challenge_repository);
+    let userquest_routes = create_userquest_routes(userquest_repository);
+
     Router::new()
         .route("/", get(root))
-        .route("/quests", post(create_quest::<T>).get(all_quests::<T>))
-        .route(
-            "/quests/:id",
-            get(find_quest::<T>)
-                .patch(update_quest::<T>)
-                .delete(delete_quest::<T>),
-        )
-        .route("/register", post(register_user::<S>))
-        .route("/login", post(login_user::<S>))
-        .route("/users/:id", get(find_user::<S>).delete(delete_user::<S>))
-        .route("/participate", post(participate_quest::<S, T>))
-        .route("/user/auth", get(auth_user::<S>))
-        .route("/challenges", post(create_challenge::<U>))
-        .route("/challenges/:id", get(find_challenge::<U>))
-        .layer(Extension(Arc::new(quest_repository)))
-        .layer(Extension(Arc::new(user_repository)))
-        .layer(Extension(Arc::new(challenge_repository)))
+        .nest("/", user_routes)
+        .nest("/", quest_routes)
+        .nest("/", challenge_routes)
+        .nest("/", userquest_routes)
         .layer(
             CorsLayer::new()
                 .allow_origin("http://localhost:5173".parse::<HeaderValue>().unwrap())
@@ -82,6 +83,40 @@ fn create_app<T: QuestRepository, S: UserRepository, U: ChallengeRepository>(
                 .allow_methods([Method::GET, Method::POST])
                 .allow_headers(vec![CONTENT_TYPE]),
         )
+}
+
+fn create_user_routes<T: UserRepository>(user_repository: T) -> Router {
+    Router::new()
+        .route("/register", post(register_user::<T>))
+        .route("/login", post(login_user::<T>))
+        .route("/users/:id", get(find_user::<T>).delete(delete_user::<T>))
+        .route("/user/auth", get(auth_user::<T>))
+        .layer(Extension(Arc::new(user_repository)))
+}
+
+fn create_quest_routes<T: QuestRepository>(quest_repository: T) -> Router {
+    Router::new()
+        .route("/quests", post(create_quest::<T>).get(all_quests::<T>))
+        .route(
+            "/quests/:id",
+            get(find_quest::<T>)
+                .patch(update_quest::<T>)
+                .delete(delete_quest::<T>),
+        )
+        .layer(Extension(Arc::new(quest_repository)))
+}
+
+fn create_challenge_routes<T: ChallengeRepository>(challenge_repository: T) -> Router {
+    Router::new()
+        .route("/challenges", post(create_challenge::<T>))
+        .route("/challenges/:id", get(find_challenge::<T>))
+        .layer(Extension(Arc::new(challenge_repository)))
+}
+
+fn create_userquest_routes<T: UserQuestRepository>(userquest_repository: T) -> Router {
+    Router::new()
+        .route("/participate", post(participate_quest::<T>))
+        .layer(Extension(Arc::new(userquest_repository)))
 }
 
 async fn root() -> &'static str {
@@ -143,14 +178,11 @@ mod test {
     #[tokio::test]
     async fn should_return_hello_world() {
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = create_app(
-            QuestRepositoryForMemory::new(),
-            UserRepositoryForMemory::new(),
-            ChallengeRepositoryForMemory::new(),
-        )
-        .oneshot(req)
-        .await
-        .unwrap();
+        let res = Router::new()
+            .route("/", get(root))
+            .oneshot(req)
+            .await
+            .unwrap();
 
         let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
         let body = String::from_utf8(bytes.to_vec()).unwrap();
@@ -183,14 +215,10 @@ mod test {
              }"#
             .to_string(),
         );
-        let res = create_app(
-            QuestRepositoryForMemory::new(),
-            UserRepositoryForMemory::new(),
-            ChallengeRepositoryForMemory::new(),
-        )
-        .oneshot(req)
-        .await
-        .unwrap();
+        let res = create_quest_routes(QuestRepositoryForMemory::new())
+            .oneshot(req)
+            .await
+            .unwrap();
         let quest = res_to_quest(res).await;
 
         // idは異なる
@@ -199,6 +227,7 @@ mod test {
 
     #[tokio::test]
     async fn should_find_quest() {
+        let quest_repository = QuestRepositoryForMemory::new();
         let expected = QuestEntity::new(
             nanoid!(),
             "Test Find Quest".to_string(),
@@ -209,9 +238,6 @@ mod test {
             123,
         );
 
-        let quest_repository = QuestRepositoryForMemory::new();
-        let user_repository = UserRepositoryForMemory::new();
-        let challenge_repository = ChallengeRepositoryForMemory::new();
         let created_quest = quest_repository
             .create(CreateQuest::new(
                 "Test Find Quest".to_string(),
@@ -226,7 +252,7 @@ mod test {
 
         let req_path = format!("{}{}", "/quests/", created_quest.id);
         let req = build_req_with_empty(&req_path, Method::GET);
-        let res = create_app(quest_repository, user_repository, challenge_repository)
+        let res = create_quest_routes(quest_repository)
             .oneshot(req)
             .await
             .unwrap();
@@ -237,6 +263,7 @@ mod test {
 
     #[tokio::test]
     async fn should_all_quests() {
+        let quest_repository = QuestRepositoryForMemory::new();
         let expected = QuestEntity::new(
             nanoid!(),
             "Test All Quests".to_string(),
@@ -246,10 +273,6 @@ mod test {
             12345,
             123,
         );
-
-        let quest_repository = QuestRepositoryForMemory::new();
-        let user_repository = UserRepositoryForMemory::new();
-        let challnege_repository = ChallengeRepositoryForMemory::new();
         quest_repository
             .create(CreateQuest::new(
                 "Test All Quests".to_string(),
@@ -263,7 +286,7 @@ mod test {
             .expect("failed to create quest");
 
         let req = build_req_with_empty("/quests", Method::GET);
-        let res = create_app(quest_repository, user_repository, challnege_repository)
+        let res = create_quest_routes(quest_repository)
             .oneshot(req)
             .await
             .unwrap();
@@ -276,6 +299,7 @@ mod test {
 
     #[tokio::test]
     async fn should_update_quest() {
+        let quest_repository = QuestRepositoryForMemory::new();
         let expected = QuestEntity::new(
             nanoid!(),
             "Test Update Quests".to_string(),
@@ -285,10 +309,6 @@ mod test {
             12345,
             123,
         );
-
-        let quest_repository = QuestRepositoryForMemory::new();
-        let user_repository = UserRepositoryForMemory::new();
-        let challenge_repository = ChallengeRepositoryForMemory::new();
         let created_quest = quest_repository
             .create(CreateQuest::new(
                 "Test Update Quests Before".to_string(),
@@ -311,7 +331,7 @@ mod test {
              }"#
             .to_string(),
         );
-        let res = create_app(quest_repository, user_repository, challenge_repository)
+        let res = create_quest_routes(quest_repository)
             .oneshot(req)
             .await
             .unwrap();
@@ -323,8 +343,6 @@ mod test {
     #[tokio::test]
     async fn should_delete_quest() {
         let quest_repository = QuestRepositoryForMemory::new();
-        let user_repository = UserRepositoryForMemory::new();
-        let challenge_repository = ChallengeRepositoryForMemory::new();
         let created_quest = quest_repository
             .create(CreateQuest::new(
                 "Test Delete Quests".to_string(),
@@ -339,7 +357,7 @@ mod test {
 
         let req_path = format!("{}{}", "/quests/", created_quest.id);
         let req = build_req_with_empty(&req_path, Method::DELETE);
-        let res = create_app(quest_repository, user_repository, challenge_repository)
+        let res = create_quest_routes(quest_repository)
             .oneshot(req)
             .await
             .unwrap();
@@ -367,14 +385,10 @@ mod test {
             .to_string(),
         );
 
-        let res = create_app(
-            QuestRepositoryForMemory::new(),
-            UserRepositoryForMemory::new(),
-            ChallengeRepositoryForMemory::new(),
-        )
-        .oneshot(req)
-        .await
-        .expect("failed to register user");
+        let res = create_user_routes(UserRepositoryForMemory::new())
+            .oneshot(req)
+            .await
+            .expect("failed to register user");
         let user = res_to_user(res).await;
 
         assert_eq!(expected, user);
@@ -382,10 +396,7 @@ mod test {
 
     #[tokio::test]
     async fn should_login_user() {
-        let quest_repository = QuestRepositoryForMemory::new();
         let user_repository = UserRepositoryForMemory::new();
-        let challenge_repository = ChallengeRepositoryForMemory::new();
-
         let created_user = user_repository
             .register(RegisterUser::new(
                 "Test User".to_string(),
@@ -405,7 +416,7 @@ mod test {
             .to_string(),
         );
 
-        let res = create_app(quest_repository, user_repository, challenge_repository)
+        let res = create_user_routes(user_repository)
             .oneshot(req)
             .await
             .expect("failed to login user");
@@ -416,10 +427,7 @@ mod test {
 
     #[tokio::test]
     async fn should_find_user() {
-        let quest_repository = QuestRepositoryForMemory::new();
         let user_repository = UserRepositoryForMemory::new();
-        let challenge_repository = ChallengeRepositoryForMemory::new();
-
         let created_user = user_repository
             .register(RegisterUser::new(
                 "Test User".to_string(),
@@ -431,7 +439,7 @@ mod test {
 
         let req_path = format!("{}{}", "/users/", created_user.id);
         let req = build_req_with_empty(&req_path, Method::GET);
-        let res = create_app(quest_repository, user_repository, challenge_repository)
+        let res = create_user_routes(user_repository)
             .oneshot(req)
             .await
             .expect("failed to find user");
@@ -442,10 +450,7 @@ mod test {
 
     #[tokio::test]
     async fn should_delete_user() {
-        let quest_repository = QuestRepositoryForMemory::new();
         let user_repository = UserRepositoryForMemory::new();
-        let challenge_repository = ChallengeRepositoryForMemory::new();
-
         let creared_user = user_repository
             .register(RegisterUser::new(
                 "Test User".to_string(),
@@ -457,7 +462,7 @@ mod test {
 
         let req_path = format!("{}{}", "/users/", creared_user.id);
         let req = build_req_with_empty(&req_path, Method::DELETE);
-        let res = create_app(quest_repository, user_repository, challenge_repository)
+        let res = create_user_routes(user_repository)
             .oneshot(req)
             .await
             .unwrap();
@@ -520,7 +525,7 @@ mod test {
             ),
         );
 
-        let res = create_app(quest_repository, user_repository, challenge_repository)
+        let res = create_user_routes(UserRepositoryForMemory::new())
             .oneshot(req)
             .await
             .unwrap();

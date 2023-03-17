@@ -18,11 +18,6 @@ pub trait UserRepository: Clone + std::marker::Send + std::marker::Sync + 'stati
     async fn login(&self, payload: LoginUser) -> anyhow::Result<UserEntity>;
     async fn find(&self, id: String) -> anyhow::Result<UserEntity>;
     async fn delete(&self, id: String) -> anyhow::Result<()>;
-    async fn participate_quest(
-        &self,
-        user: UserEntity,
-        quest: QuestFromRow,
-    ) -> anyhow::Result<UserEntity>;
 }
 
 #[derive(Debug, Clone)]
@@ -184,26 +179,6 @@ impl UserRepository for UserRepositoryForDb {
 
         anyhow::Ok(())
     }
-
-    async fn participate_quest(
-        &self,
-        user: UserEntity,
-        quest: QuestFromRow,
-    ) -> anyhow::Result<UserEntity> {
-        sqlx::query!(
-            r#"
-            insert into user_quests (user_id, quest_id) values ($1, $2)
-            "#,
-            user.id.clone(),
-            quest.id
-        )
-        .execute(&self.pool)
-        .await?;
-
-        let user = self.find(user.id).await?;
-
-        anyhow::Ok(user)
-    }
 }
 
 type UserDatas = HashMap<String, UserEntity>;
@@ -265,27 +240,6 @@ impl UserRepository for UserRepositoryForMemory {
         let mut store = self.write_store_ref();
         store.remove(&id).context(NotFound)?;
         anyhow::Ok(())
-    }
-
-    async fn participate_quest(
-        &self,
-        user: UserEntity,
-        quest: QuestFromRow,
-    ) -> anyhow::Result<UserEntity> {
-        let mut store = self.write_store_ref();
-        let mut participate_quest = user.participate_quest;
-        participate_quest.push(quest);
-        let updated_user = UserEntity {
-            id: (user.id).clone(),
-            username: user.username,
-            email: user.email,
-            password: user.password,
-            participate_quest,
-        };
-        if let Some(x) = store.get_mut(&(user.id)) {
-            *x = updated_user.clone();
-        };
-        anyhow::Ok(updated_user)
     }
 }
 
@@ -363,10 +317,4 @@ impl RegisterUser {
 pub struct LoginUser {
     email: String,
     password: String,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ParticipateQuest {
-    pub user_id: String,
-    pub quest_id: String,
 }
