@@ -3,7 +3,7 @@ services:
   database:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./docker/db/Dockerfile
       target: 'database'
     ports:
       - '5432:5432'
@@ -15,5 +15,16 @@ services:
       POSTGRES_DB: quests
       TZ: Asia/Tokyo
     restart: always
+  api:
+    build:
+      context: .
+      dockerfile: ./docker/web/Dockerfile
+    ports:
+      - '3000:3000'
+    depends_on:
+      - database
+    environment:
+      - DATABASE_URL=postgres://admin:admin@database:5432/quests
+
 volumes:
   pgdate:
