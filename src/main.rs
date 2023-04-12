@@ -37,6 +37,11 @@ async fn main() {
         .await
         .expect(&format!("fail connect database, url is [{}]", database_url));
 
+    let port = env::var("PORT")
+        .unwrap_or_else(|_| "3000".to_string())
+        .parse()
+        .expect("Failed to parse PORT");
+
     let app = create_app(
         QuestRepositoryForDb::new(pool.clone()),
         UserRepositoryForDb::new(pool.clone()),
@@ -44,7 +49,7 @@ async fn main() {
         UserQuestRepositoryForDb::new(pool.clone()),
     );
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
     tracing::debug!("listening on {}", addr);
 
