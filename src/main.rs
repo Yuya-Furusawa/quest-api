@@ -142,10 +142,10 @@ mod test {
     use tower::ServiceExt;
 
     use crate::repositories::{
-        challenge::ChallengeRepositoryForMemory,
-        quest::{CreateQuest, Difficulty, QuestEntity, QuestFromRow, QuestRepositoryForMemory},
+        challenge::{Challenge, ChallengeRepositoryForMemory, CreateChallenge},
+        quest::{CreateQuest, Difficulty, QuestEntity, QuestRepositoryForMemory},
         user::{RegisterUser, UserEntity, UserRepositoryForMemory},
-        user_quest::{ParticipateQuest, ParticipateQuestPayload, UserQuestRepositoryForMemory},
+        user_quest::{ParticipateQuest, UserQuestRepositoryForMemory},
     };
 
     fn build_req_with_empty(path: &str, method: Method) -> Request<Body> {
@@ -189,6 +189,16 @@ mod test {
             body
         ));
         userquest
+    }
+
+    async fn res_to_challenge(res: Response) -> Challenge {
+        let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
+        let body = String::from_utf8(bytes.to_vec()).unwrap();
+        let challenge: Challenge = serde_json::from_str(&body).expect(&format!(
+            "cannot convert ParticipateQuest instance. body: {}",
+            body
+        ));
+        challenge
     }
 
     #[tokio::test]
@@ -512,5 +522,58 @@ mod test {
         let result = res_to_userquest(res).await;
 
         assert_eq!(expected, result)
+    }
+
+    #[tokio::test]
+    async fn should_create_challenge() {
+        let expected = Challenge::new(
+            nanoid!(),
+            "Test Challenge".to_string(),
+            "This is a test challenge".to_string(),
+            "test_id".to_string()
+        );
+
+        let req = build_req_with_json(
+            "/challenges",
+            Method::POST,
+            r#"{
+                "name": "Test Challenge",
+                "description": "This is a test challenge",
+                "quest_id": "test_id"
+            }"#
+            .to_string()
+        );
+
+        let res = create_challenge_routes(ChallengeRepositoryForMemory::new())
+            .oneshot(req)
+            .await
+            .unwrap();
+
+        let result = res_to_challenge(res).await;
+
+        assert_eq!(expected, result)
+    }
+
+    #[tokio::test]
+    async fn should_find_challenge() {
+        let challenge_repository = ChallengeRepositoryForMemory::new();
+        let created_challenge = challenge_repository
+            .create(CreateChallenge::new(
+                "Test Challenge".to_string(),
+                "This is a test challenge".to_string(),
+                "test_id".to_string(),
+            ))
+            .await
+            .expect("failed to create challenge");
+
+        let req_path = format!("{}{}", "/challenges/", created_challenge.id);
+        let req = build_req_with_empty(&req_path, Method::GET);
+        let res = create_challenge_routes(challenge_repository)
+            .oneshot(req)
+            .await
+            .expect("failed to find challenge");
+        let challenge = res_to_challenge(res).await;
+
+        assert_eq!(created_challenge, challenge);
     }
 }

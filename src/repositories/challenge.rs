@@ -105,7 +105,7 @@ impl ChallengeRepository for ChallengeRepositoryForMemory {
 
 #[derive(Debug, Clone, Deserialize, Serialize, FromRow)]
 pub struct Challenge {
-    id: String,
+    pub id: String,
     name: String,
     description: String,
     pub quest_id: String,
@@ -122,9 +122,28 @@ impl Challenge {
     }
 }
 
+// 各fieldが一致したとき==とみなす
+impl PartialEq for Challenge {
+    fn eq(&self, other: &Challenge) -> bool {
+        (self.name == other.name)
+            && (self.description == other.description)
+            && (self.quest_id == other.quest_id)
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CreateChallenge {
     name: String,
     description: String,
     quest_id: String,
+}
+
+impl CreateChallenge {
+    pub fn new(name: String, description: String, quest_id: String) -> Self {
+        Self {
+            name,
+            description,
+            quest_id
+        }
+    }
 }
