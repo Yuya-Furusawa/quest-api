@@ -145,7 +145,7 @@ impl CreateChallenge {
         Self {
             name,
             description,
-            quest_id
+            quest_id,
         }
     }
 }

@@ -530,7 +530,7 @@ mod test {
             nanoid!(),
             "Test Challenge".to_string(),
             "This is a test challenge".to_string(),
-            "test_id".to_string()
+            "test_id".to_string(),
         );
 
         let req = build_req_with_json(
@@ -541,7 +541,7 @@ mod test {
                 "description": "This is a test challenge",
                 "quest_id": "test_id"
             }"#
-            .to_string()
+            .to_string(),
         );
 
         let res = create_challenge_routes(ChallengeRepositoryForMemory::new())
