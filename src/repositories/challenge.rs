@@ -66,6 +66,7 @@ pub struct ChallengeRepositoryForMemory {
 }
 
 impl ChallengeRepositoryForMemory {
+    #[cfg(test)]
     pub fn new() -> Self {
         Self {
             store: Arc::default(),
@@ -138,6 +139,7 @@ pub struct CreateChallenge {
     quest_id: String,
 }
 
+#[cfg(test)]
 impl CreateChallenge {
     pub fn new(name: String, description: String, quest_id: String) -> Self {
         Self {

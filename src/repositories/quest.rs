@@ -202,6 +202,7 @@ pub struct QuestRepositoryForMemory {
 }
 
 impl QuestRepositoryForMemory {
+    #[cfg(test)]
     pub fn new() -> Self {
         Self {
             store: Arc::default(),
@@ -381,6 +382,7 @@ pub struct CreateQuest {
     num_clear: i32,
 }
 
+#[cfg(test)]
 impl CreateQuest {
     pub fn new(
         title: String,

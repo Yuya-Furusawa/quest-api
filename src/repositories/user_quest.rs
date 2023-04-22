@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
 use std::{
     collections::HashMap,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    sync::{Arc, RwLock, RwLockWriteGuard},
 };
 
 #[async_trait]
@@ -54,6 +54,7 @@ pub struct UserQuestRepositoryForMemory {
 }
 
 impl UserQuestRepositoryForMemory {
+    #[cfg(test)]
     pub fn new() -> Self {
         Self {
             store: Arc::default(),
@@ -62,10 +63,6 @@ impl UserQuestRepositoryForMemory {
 
     fn write_store_ref(&self) -> RwLockWriteGuard<UserQuestDatas> {
         self.store.write().unwrap()
-    }
-
-    fn read_store_ref(&self) -> RwLockReadGuard<UserQuestDatas> {
-        self.store.read().unwrap()
     }
 }
 

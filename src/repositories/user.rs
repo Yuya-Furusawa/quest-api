@@ -189,6 +189,7 @@ pub struct UserRepositoryForMemory {
 }
 
 impl UserRepositoryForMemory {
+    #[cfg(test)]
     pub fn new() -> Self {
         Self {
             store: Arc::default(),
@@ -251,6 +252,7 @@ struct UserFromRow {
     password: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, FromRow)]
 struct UserWithQuestFromRow {
     id: i32,
@@ -303,6 +305,7 @@ pub struct RegisterUser {
     password: String,
 }
 
+#[cfg(test)]
 impl RegisterUser {
     pub fn new(username: String, email: String, password: String) -> Self {
         Self {
