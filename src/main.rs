@@ -15,7 +15,7 @@ use std::{env, net::SocketAddr, sync::Arc};
 use tower_http::cors::CorsLayer;
 
 use crate::handlers::{
-    challenge::{create_challenge, find_challenge},
+    challenge::{create_challenge, find_challenge, find_challenge_by_quest_id},
     quest::{all_quests, create_quest, delete_quest, find_quest, update_quest},
     user::{auth_user, delete_user, find_user, login_user, register_user},
     user_quest::participate_quest,
@@ -113,7 +113,10 @@ fn create_quest_routes<T: QuestRepository>(quest_repository: T) -> Router {
 
 fn create_challenge_routes<T: ChallengeRepository>(challenge_repository: T) -> Router {
     Router::new()
-        .route("/challenges", post(create_challenge::<T>))
+        .route(
+            "/challenges",
+            post(create_challenge::<T>).get(find_challenge_by_quest_id::<T>),
+        )
         .route("/challenges/:id", get(find_challenge::<T>))
         .layer(Extension(Arc::new(challenge_repository)))
 }
@@ -574,6 +577,33 @@ mod test {
             .expect("failed to find challenge");
         let challenge = res_to_challenge(res).await;
 
-        assert_eq!(created_challenge, challenge);
+        assert_eq!(created_challenge, challenge)
+    }
+
+    #[tokio::test]
+    async fn should_find_challnege_by_quest_id() {
+        let challenge_repository = ChallengeRepositoryForMemory::new();
+        let created_challenge = challenge_repository
+            .create(CreateChallenge::new(
+                "Test Challenge".to_string(),
+                "This is a test challenge".to_string(),
+                "test_id".to_string(),
+            ))
+            .await
+            .expect("failed to create challenge");
+
+        let req_path = format!("{}?quest_id={}", "/challenges", created_challenge.quest_id);
+        let req = build_req_with_empty(&req_path, Method::GET);
+        let res = create_challenge_routes(challenge_repository)
+            .oneshot(req)
+            .await
+            .expect("failed to find challenge");
+
+        let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
+        let body: String = String::from_utf8(bytes.to_vec()).unwrap();
+        let challenges: Vec<Challenge> = serde_json::from_str(&body)
+            .expect(&format!("cannot convert Challenge instance. body {}", body));
+
+        assert_eq!(vec![created_challenge], challenges)
     }
 }

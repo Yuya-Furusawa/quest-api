@@ -12,6 +12,7 @@ use std::{
 pub trait ChallengeRepository: Clone + std::marker::Send + std::marker::Sync + 'static {
     async fn create(&self, payload: CreateChallenge) -> anyhow::Result<Challenge>;
     async fn find(&self, id: String) -> anyhow::Result<Challenge>;
+    async fn find_by_quest_id(&self, quest_id: String) -> anyhow::Result<Vec<Challenge>>;
 }
 
 #[derive(Debug, Clone)]
@@ -55,6 +56,19 @@ impl ChallengeRepository for ChallengeRepositoryForDb {
         .await?;
 
         Ok(challenge)
+    }
+
+    async fn find_by_quest_id(&self, quest_id: String) -> anyhow::Result<Vec<Challenge>> {
+        let challenges = sqlx::query_as::<_, Challenge>(
+            r#"
+                select * from challenges where quest_id = $1;
+            "#,
+        )
+        .bind(quest_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(challenges)
     }
 }
 
@@ -102,6 +116,16 @@ impl ChallengeRepository for ChallengeRepositoryForMemory {
         let challenge = store.get(&id).map(|challenge| challenge.clone()).unwrap();
         Ok(challenge)
     }
+
+    async fn find_by_quest_id(&self, quest_id: String) -> anyhow::Result<Vec<Challenge>> {
+        let store = self.read_store_ref();
+        let challenges = store
+            .values()
+            .filter(|challenge| challenge.quest_id == quest_id)
+            .map(|challenge| challenge.clone())
+            .collect::<Vec<Challenge>>();
+        Ok(challenges)
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, FromRow)]
@@ -148,4 +172,9 @@ impl CreateChallenge {
             quest_id,
         }
     }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct FindChallengeByQuestId {
+    pub quest_id: String,
 }
