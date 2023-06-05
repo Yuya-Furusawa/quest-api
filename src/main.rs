@@ -84,6 +84,7 @@ fn create_app<
         .layer(
             CorsLayer::new()
                 .allow_origin("http://localhost:5173".parse::<HeaderValue>().unwrap())
+                .allow_origin("https://quest-web-efrl9umtr-yuya-furusawa.vercel.app".parse::<HeaderValue>().unwrap())
                 .allow_credentials(true)
                 .allow_methods([Method::GET, Method::POST])
                 .allow_headers(vec![CONTENT_TYPE]),
