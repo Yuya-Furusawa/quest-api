@@ -438,9 +438,9 @@ mod test {
 
         let req = build_req_with_json(
             "/login",
-            Method::GET,
+            Method::POST,
             r#"{
-                "username": "Test User",
+                "email": "test@test.com",
                 "password": "password"
             }"#
             .to_string(),
