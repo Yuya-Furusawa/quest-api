@@ -7,9 +7,9 @@ db:
 	docker-compose up
 
 dev:
-	sqlx db create --database-url $(DATABASE_URL)
-	sqlx migrate run --ignore-missing
-	cargo watch -x run
+	docker-compose exec api bash -c "sqlx db create --database-url $(DATABASE_URL)"
+	docker-compose exec api bash -c "sqlx migrate run --ignore-missing"
+	docker-compose exec api cargo watch -x run
 
 test:
 	cargo test
