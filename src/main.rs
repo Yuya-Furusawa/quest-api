@@ -535,6 +535,8 @@ mod test {
             "Test Challenge".to_string(),
             "This is a test challenge".to_string(),
             "test_id".to_string(),
+            35.6895,
+            139.6917
         );
 
         let req = build_req_with_json(
@@ -543,7 +545,9 @@ mod test {
             r#"{
                 "name": "Test Challenge",
                 "description": "This is a test challenge",
-                "quest_id": "test_id"
+                "quest_id": "test_id",
+                "latitude": 35.6895,
+                "longitude": 139.6917
             }"#
             .to_string(),
         );
@@ -566,6 +570,8 @@ mod test {
                 "Test Challenge".to_string(),
                 "This is a test challenge".to_string(),
                 "test_id".to_string(),
+                35.6895,
+                139.6917
             ))
             .await
             .expect("failed to create challenge");
@@ -589,6 +595,8 @@ mod test {
                 "Test Challenge".to_string(),
                 "This is a test challenge".to_string(),
                 "test_id".to_string(),
+                35.6895,
+                139.6917
             ))
             .await
             .expect("failed to create challenge");

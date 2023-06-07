@@ -31,7 +31,7 @@ impl ChallengeRepository for ChallengeRepositoryForDb {
     async fn create(&self, payload: CreateChallenge) -> anyhow::Result<Challenge> {
         let challenge = sqlx::query_as::<_, Challenge>(
             r#"
-				insert into challenges values ($1, $2, $3, $4)
+				insert into challenges values ($1, $2, $3, $4, $5, $6)
 				returning *
 			"#,
         )
@@ -39,6 +39,8 @@ impl ChallengeRepository for ChallengeRepositoryForDb {
         .bind(payload.name)
         .bind(payload.description)
         .bind(payload.quest_id)
+        .bind(payload.latitude)
+        .bind(payload.longitude)
         .fetch_one(&self.pool)
         .await?;
 
@@ -106,6 +108,8 @@ impl ChallengeRepository for ChallengeRepositoryForMemory {
             payload.name,
             payload.description,
             payload.quest_id,
+            payload.latitude,
+            payload.longitude,
         );
         store.insert(id, challenge.clone());
         Ok(challenge)
@@ -134,15 +138,19 @@ pub struct Challenge {
     name: String,
     description: String,
     pub quest_id: String,
+    latitude: f64,
+    longitude: f64
 }
 
 impl Challenge {
-    pub fn new(id: String, name: String, description: String, quest_id: String) -> Self {
+    pub fn new(id: String, name: String, description: String, quest_id: String, latitude: f64, longitude: f64) -> Self {
         Self {
             id,
             name,
             description,
             quest_id,
+            latitude,
+            longitude,
         }
     }
 }
@@ -161,15 +169,19 @@ pub struct CreateChallenge {
     name: String,
     description: String,
     quest_id: String,
+    latitude: f64,
+    longitude: f64,
 }
 
 #[cfg(test)]
 impl CreateChallenge {
-    pub fn new(name: String, description: String, quest_id: String) -> Self {
+    pub fn new(name: String, description: String, quest_id: String, latitude: f64, longitude: f64) -> Self {
         Self {
             name,
             description,
             quest_id,
+            latitude,
+            longitude,
         }
     }
 }
