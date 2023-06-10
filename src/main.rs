@@ -75,6 +75,11 @@ fn create_app<
     let challenge_routes = create_challenge_routes(challenge_repository);
     let userquest_routes = create_userquest_routes(userquest_repository);
 
+    let origins = [
+        "http://localhost:5173".parse::<HeaderValue>().unwrap(),
+        "https://quest-web-cli.vercel.app/".parse::<HeaderValue>().unwrap()
+    ];
+
     Router::new()
         .route("/", get(root))
         .nest("/", user_routes)
@@ -83,8 +88,7 @@ fn create_app<
         .nest("/", userquest_routes)
         .layer(
             CorsLayer::new()
-                .allow_origin("http://localhost:5173".parse::<HeaderValue>().unwrap())
-                .allow_origin("https://quest-web-efrl9umtr-yuya-furusawa.vercel.app".parse::<HeaderValue>().unwrap())
+                .allow_origin(origins)
                 .allow_credentials(true)
                 .allow_methods([Method::GET, Method::POST])
                 .allow_headers(vec![CONTENT_TYPE]),
