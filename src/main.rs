@@ -77,7 +77,7 @@ fn create_app<
 
     let origins = [
         "http://localhost:5173".parse::<HeaderValue>().unwrap(),
-        "https://quest-web-cli.vercel.app/".parse::<HeaderValue>().unwrap()
+        "https://quest-web-cli.vercel.app".parse::<HeaderValue>().unwrap()
     ];
 
     Router::new()
