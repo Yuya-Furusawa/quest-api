@@ -139,11 +139,18 @@ pub struct Challenge {
     description: String,
     pub quest_id: String,
     latitude: f64,
-    longitude: f64
+    longitude: f64,
 }
 
 impl Challenge {
-    pub fn new(id: String, name: String, description: String, quest_id: String, latitude: f64, longitude: f64) -> Self {
+    pub fn new(
+        id: String,
+        name: String,
+        description: String,
+        quest_id: String,
+        latitude: f64,
+        longitude: f64,
+    ) -> Self {
         Self {
             id,
             name,
@@ -175,7 +182,13 @@ pub struct CreateChallenge {
 
 #[cfg(test)]
 impl CreateChallenge {
-    pub fn new(name: String, description: String, quest_id: String, latitude: f64, longitude: f64) -> Self {
+    pub fn new(
+        name: String,
+        description: String,
+        quest_id: String,
+        latitude: f64,
+        longitude: f64,
+    ) -> Self {
         Self {
             name,
             description,
