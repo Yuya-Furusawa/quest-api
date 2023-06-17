@@ -77,7 +77,9 @@ fn create_app<
 
     let origins = [
         "http://localhost:5173".parse::<HeaderValue>().unwrap(),
-        "https://quest-web-cli.vercel.app".parse::<HeaderValue>().unwrap()
+        "https://quest-web-cli.vercel.app"
+            .parse::<HeaderValue>()
+            .unwrap(),
     ];
 
     Router::new()
@@ -145,6 +147,7 @@ mod test {
         http::{header, Method, Request},
         response::Response,
     };
+    use http::{header::COOKIE, HeaderMap};
     use hyper::{self, StatusCode};
     use nanoid::nanoid;
     use tower::ServiceExt;
@@ -183,10 +186,23 @@ mod test {
 
     async fn res_to_user(res: Response) -> UserEntity {
         let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
-        let body = String::from_utf8(bytes.to_vec()).unwrap();
-        let user: UserEntity = serde_json::from_str(&body)
-            .expect(&format!("cannot convert User instance. body: {}", body));
+        let body_str = String::from_utf8(bytes.to_vec()).unwrap();
+        let user: UserEntity = serde_json::from_str(&body_str)
+            .expect(&format!("cannot convert User instance. body: {}", body_str));
         user
+    }
+
+    async fn res_to_usercookie(res: Response) -> (UserEntity, HeaderMap) {
+        let (parts, body) = res.into_parts();
+
+        let bytes = hyper::body::to_bytes(body).await.unwrap();
+        let body_str = String::from_utf8(bytes.to_vec()).unwrap();
+        let user: UserEntity = serde_json::from_str(&body_str)
+            .expect(&format!("cannot convert User instance. body: {}", body_str));
+
+        let header_map = parts.headers;
+
+        (user, header_map)
     }
 
     async fn res_to_userquest(res: Response) -> ParticipateQuest {
@@ -401,6 +417,7 @@ mod test {
 
     #[tokio::test]
     async fn should_register_user() {
+        let user_repository = UserRepositoryForMemory::new();
         let expected = UserEntity::new(
             nanoid!(),
             "Test User".to_string(),
@@ -419,13 +436,15 @@ mod test {
             .to_string(),
         );
 
-        let res = create_user_routes(UserRepositoryForMemory::new())
+        let res = create_user_routes(user_repository)
             .oneshot(req)
             .await
             .expect("failed to register user");
-        let user = res_to_user(res).await;
+
+        let (user, header_map) = res_to_usercookie(res).await;
 
         assert_eq!(expected, user);
+        assert!(header_map.contains_key(COOKIE));
     }
 
     #[tokio::test]
@@ -454,9 +473,10 @@ mod test {
             .oneshot(req)
             .await
             .expect("failed to login user");
-        let user = res_to_user(res).await;
+        let (user, header_map) = res_to_usercookie(res).await;
 
         assert_eq!(created_user, user);
+        assert!(header_map.contains_key(COOKIE));
     }
 
     #[tokio::test]
@@ -540,7 +560,7 @@ mod test {
             "This is a test challenge".to_string(),
             "test_id".to_string(),
             35.6895,
-            139.6917
+            139.6917,
         );
 
         let req = build_req_with_json(
@@ -575,7 +595,7 @@ mod test {
                 "This is a test challenge".to_string(),
                 "test_id".to_string(),
                 35.6895,
-                139.6917
+                139.6917,
             ))
             .await
             .expect("failed to create challenge");
@@ -600,7 +620,7 @@ mod test {
                 "This is a test challenge".to_string(),
                 "test_id".to_string(),
                 35.6895,
-                139.6917
+                139.6917,
             ))
             .await
             .expect("failed to create challenge");
