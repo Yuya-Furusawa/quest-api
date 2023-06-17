@@ -1,43 +1,39 @@
-use async_session::{Session, SessionStore};
-use async_sqlx_session::PostgresSessionStore;
 use dotenv::dotenv;
-use std::{env, time::Duration};
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
+use serde::{Deserialize, Serialize};
+use std::env;
 
-use crate::repositories::user::UserEntity;
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Claims {
+    pub user_id: String,
+    iat: i64,
+    exp: i64,
+}
 
-pub async fn create_session(user: &UserEntity) -> SessionToken {
+pub fn create_jwt(user_id: &String, iat: i64, exp: &i64) -> String {
     dotenv().ok();
-    let database_url = &env::var("DATABASE_URL").expect("undefined [DATABASE_URL]");
-    let store = PostgresSessionStore::new(&database_url).await.unwrap();
+    let secret_key = &env::var("JWT_SECRET_KEY").expect("undefined [JWT_SECRET_KEY]");
 
-    let mut session = Session::new();
-    session.insert_raw("session_id", (user.id).clone());
-    session.expire_in(Duration::from_secs(60));
+    let my_claims = Claims {
+        user_id: user_id.clone(),
+        iat: iat,
+        exp: *exp,
+    };
 
-    let cookie = store.store_session(session).await.unwrap().unwrap();
-    let cookie_session = store.load_session(cookie).await.unwrap().unwrap();
-    let cookie_string = cookie_session.get_raw("session_id").unwrap();
-
-    SessionToken::new(&cookie_string)
+    encode(
+        &Header::default(),
+        &my_claims,
+        &EncodingKey::from_secret(secret_key.as_ref()),
+    )
+    .unwrap()
 }
 
-pub struct SessionToken {
-    token: String,
-    max_age: usize,
-}
-
-impl SessionToken {
-    pub fn new(token: &str) -> SessionToken {
-        SessionToken {
-            token: token.to_string(),
-            max_age: 60,
-        }
-    }
-
-    pub fn cookie(&self) -> String {
-        format!(
-            "{}={}; Max-Age={}; Path=/; HttpOnly",
-            "session_id", self.token, self.max_age
-        )
-    }
+pub fn decode_jwt(jwt: &str) -> Result<TokenData<Claims>, jsonwebtoken::errors::Error> {
+    dotenv().ok();
+    let secret_key = &env::var("JWT_SECRET_KEY").expect("undefined [JWT_SECRET_KEY]");
+    decode::<Claims>(
+        jwt,
+        &DecodingKey::from_secret(secret_key.as_ref()),
+        &Validation::default(),
+    )
 }
