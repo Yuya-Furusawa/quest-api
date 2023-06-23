@@ -1,7 +1,5 @@
-use dotenv::dotenv;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
 use serde::{Deserialize, Serialize};
-use std::env;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
@@ -10,10 +8,7 @@ pub struct Claims {
     exp: i64,
 }
 
-pub fn create_jwt(user_id: &String, iat: i64, exp: &i64) -> String {
-    dotenv().ok();
-    let secret_key = &env::var("JWT_SECRET_KEY").expect("undefined [JWT_SECRET_KEY]");
-
+pub fn create_jwt(user_id: &String, iat: i64, exp: &i64, secret_key: &String) -> String {
     let my_claims = Claims {
         user_id: user_id.clone(),
         iat: iat,
@@ -25,12 +20,13 @@ pub fn create_jwt(user_id: &String, iat: i64, exp: &i64) -> String {
         &my_claims,
         &EncodingKey::from_secret(secret_key.as_ref()),
     )
-    .unwrap()
+    .expect("Failed to encode token. Likely wrong secret keys")
 }
 
-pub fn decode_jwt(jwt: &str) -> Result<TokenData<Claims>, jsonwebtoken::errors::Error> {
-    dotenv().ok();
-    let secret_key = &env::var("JWT_SECRET_KEY").expect("undefined [JWT_SECRET_KEY]");
+pub fn decode_jwt(
+    jwt: &str,
+    secret_key: &String,
+) -> Result<TokenData<Claims>, jsonwebtoken::errors::Error> {
     decode::<Claims>(
         jwt,
         &DecodingKey::from_secret(secret_key.as_ref()),
