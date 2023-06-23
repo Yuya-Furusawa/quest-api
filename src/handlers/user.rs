@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{env, sync::Arc};
 
 use axum::{
     extract::{Extension, Path},
@@ -8,6 +8,7 @@ use axum::{
 };
 use chrono::{Duration, Utc};
 use cookie::{time::OffsetDateTime, Cookie, Expiration};
+use dotenv::dotenv;
 
 use crate::{
     repositories::user::{LoginUser, RegisterUser, UserRepository},
@@ -18,6 +19,9 @@ pub async fn register_user<T: UserRepository>(
     Json(payload): Json<RegisterUser>,
     Extension(repository): Extension<Arc<T>>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    dotenv().ok();
+    let secret_key = &env::var("JWT_SECRET_KEY").expect("undefined [JWT_SECRET_KEY]");
+
     let user = repository
         .register(payload)
         .await
@@ -27,7 +31,7 @@ pub async fn register_user<T: UserRepository>(
     let iat = now.timestamp();
     let exp = (now + Duration::hours(8)).timestamp();
 
-    let token = create_jwt(&user.id, iat, &exp);
+    let token = create_jwt(&user.id, iat, &exp, &secret_key);
     let cookie = Cookie::build("session_token", &token)
         .path("/")
         .expires(Expiration::from(
@@ -48,6 +52,9 @@ pub async fn login_user<T: UserRepository>(
     Json(payload): Json<LoginUser>,
     Extension(repository): Extension<Arc<T>>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    dotenv().ok();
+    let secret_key = &env::var("JWT_SECRET_KEY").expect("undefined [JWT_SECRET_KEY]");
+
     let user = repository
         .login(payload)
         .await
@@ -57,7 +64,7 @@ pub async fn login_user<T: UserRepository>(
     let iat = now.timestamp();
     let exp = (now + Duration::hours(8)).timestamp();
 
-    let token = create_jwt(&user.id, iat, &exp);
+    let token = create_jwt(&user.id, iat, &exp, &secret_key);
     let cookie = Cookie::build("session_token", &token)
         .path("/")
         .expires(Expiration::from(
@@ -103,10 +110,12 @@ impl IntoResponse for AuthError {
     fn into_response(self) -> Response {
         match self {
             AuthError::NotFoundCookie => {
-                return (StatusCode::UNAUTHORIZED, "Not found cookie").into_response()
+                tracing::error!("Not found cookie");
+                return StatusCode::UNAUTHORIZED.into_response();
             }
             AuthError::NotFoundUser => {
-                return (StatusCode::NOT_FOUND, "Not found a user").into_response()
+                tracing::error!("Not found user");
+                return StatusCode::NOT_FOUND.into_response();
             }
         };
     }
@@ -117,7 +126,10 @@ pub async fn auth_user<T: UserRepository>(
     Extension(user_repository): Extension<Arc<T>>,
 ) -> Result<impl IntoResponse, AuthError> {
     if let Some(cookie_token) = cookie.get("session_token") {
-        let decoded_token = decode_jwt(cookie_token).unwrap();
+        dotenv().ok();
+        let secret_key = &env::var("JWT_SECRET_KEY").expect("undefined [JWT_SECRET_KEY]");
+
+        let decoded_token = decode_jwt(cookie_token, &secret_key).unwrap();
 
         let user = user_repository
             .find(decoded_token.claims.user_id)
