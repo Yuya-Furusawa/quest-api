@@ -17,6 +17,7 @@ impl DynamoDB {
  * "users" Table
  * ============
  */
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UserItem {
     pub id: String,
     pub email: String,
@@ -139,6 +140,7 @@ impl DynamoDB {
  * "quests" Table
  * ===========
  */
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QuestItem {
     pub id: String,
     pub title: String,
@@ -147,6 +149,7 @@ pub struct QuestItem {
     pub difficulty: Difficulty,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Difficulty {
     Easy,
     Normal,
@@ -275,6 +278,7 @@ impl DynamoDB {
  * "challenges" Table
  * ==============
  */
+#[derive(Debug, Clone, PartialEq)]
 pub struct ChallengeItem {
     id: String,
     quest_id: String,
@@ -350,5 +354,57 @@ impl DynamoDB {
             .map(Self::map_item_to_challenge_item)
             .collect::<Vec<ChallengeItem>>();
         Ok(challenges)
+    }
+}
+
+/// 実行前にdocker composeでdynamodb-localを起動しておく必要がある
+#[cfg(all(test, feature = "db-tests"))]
+mod tests {
+    use super::*;
+
+    async fn create_client() -> DynamoDB {
+        let credentials = aws_sdk_dynamodb::config::Credentials::for_tests();
+        let region = aws_sdk_dynamodb::config::Region::new("ap-northeast-1");
+        let config = aws_sdk_dynamodb::Config::builder()
+            .endpoint_url("http://localhost:4566")
+            .credentials_provider(credentials)
+            .region(region)
+            .build();
+        let client = Client::from_conf(config);
+        DynamoDB { client }
+    }
+
+    #[tokio::test]
+    async fn test_quest_crud() {
+        let db = create_client().await;
+
+        let quest = QuestItem {
+            id: "test-quest".to_string(),
+            title: "Test Quest".to_string(),
+            description: "This is a test quest".to_string(),
+            price: 100,
+            difficulty: Difficulty::Easy,
+        };
+        db.put_quest(quest.clone()).await.unwrap();
+
+        let queried_quest = db.get_quest_by_id(quest.id.clone()).await.unwrap();
+        assert_eq!(queried_quest, Some(quest.clone()));
+
+        let queried_quests = db.get_all().await.unwrap();
+        assert_eq!(queried_quests.len(), 1);
+        assert_eq!(queried_quests[0], quest);
+
+        let updated_quest = QuestItem {
+            difficulty: Difficulty::Normal,
+            ..quest
+        };
+        db.update_quest(updated_quest.clone()).await.unwrap();
+
+        let queried_quest = db.get_quest_by_id(updated_quest.id.clone()).await.unwrap();
+        assert_eq!(queried_quest, Some(updated_quest.clone()));
+
+        db.delete_quest(updated_quest.id.clone()).await.unwrap();
+        let queried_quest = db.get_quest_by_id(updated_quest.id.clone()).await.unwrap();
+        assert_eq!(queried_quest, None);
     }
 }

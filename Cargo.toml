@@ -5,10 +5,15 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = ["db-tests"]
+db-tests = []
+
+
 [dependencies]
 anyhow = "1.0.66"
 aws-config = "0.55.3"
-aws-sdk-dynamodb = "0.28.0"
+aws-sdk-dynamodb = { version = "0.28.0", features = ["test-util"] }
 axum = { version = "0.5.17", features = ["headers"] }
 bcrypt = "0.14"
 chrono = "0.4.26"
