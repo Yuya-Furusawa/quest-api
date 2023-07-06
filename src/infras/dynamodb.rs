@@ -65,17 +65,38 @@ impl DynamoDB {
     }
 
     pub async fn get_user_by_email(&self, email: String) -> anyhow::Result<Option<UserItem>> {
+        // NOTE: グローバルセカンダリインデックスからクエリするときにはGetItemは使えない。
+        // Queryを使う必要がある
         let result = self
             .client
-            .get_item()
+            .query()
             .table_name(Self::USER_TABLE_NAME)
-            .key("UserEmail", AttributeValue::S(email))
+            .index_name("UserEmailIndex")
+            .key_condition_expression("UserEmail = :email")
+            .expression_attribute_values(":email", AttributeValue::S(email))
             .send()
             .await?;
-        let Some(item) = result.item() else {
+        let Some(items) = result.items() else {
             return Ok(None);
         };
-        Ok(Some(Self::map_item_to_user_item(item)))
+        if items.len() > 1 {
+            anyhow::bail!("UserEmail is not unique");
+        }
+        Ok(Some(Self::map_item_to_user_item(items.first().unwrap())))
+    }
+
+    pub async fn update_user(&self, user: UserItem) -> anyhow::Result<()> {
+        self.client
+            .update_item()
+            .table_name(Self::USER_TABLE_NAME)
+            .key("UserId", AttributeValue::S(user.id))
+            .update_expression("SET UserEmail = :email, UserName = :name, UserPassword = :password")
+            .expression_attribute_values(":email", AttributeValue::S(user.email))
+            .expression_attribute_values(":name", AttributeValue::S(user.name))
+            .expression_attribute_values(":password", AttributeValue::S(user.hashed_password))
+            .send()
+            .await?;
+        Ok(())
     }
 
     pub async fn delete_user(&self, id: String) -> anyhow::Result<()> {
@@ -227,7 +248,7 @@ impl DynamoDB {
         Ok(Some(Self::map_item_to_quest_item(item)))
     }
 
-    pub async fn get_all(&self) -> anyhow::Result<Vec<QuestItem>> {
+    pub async fn get_quests(&self) -> anyhow::Result<Vec<QuestItem>> {
         Ok(self
             .client
             .scan()
@@ -320,11 +341,16 @@ impl DynamoDB {
         }
     }
 
-    pub async fn get_by_id(&self, id: String) -> anyhow::Result<Option<ChallengeItem>> {
+    pub async fn get_challenge_by_id_and_quest_id(
+        &self,
+        id: String,
+        quest_id: String,
+    ) -> anyhow::Result<Option<ChallengeItem>> {
         let result = self
             .client
             .get_item()
             .table_name(Self::CHALLENGE_TABLE_NAME)
+            .key("QuestId", AttributeValue::S(quest_id))
             .key("ChallengeId", AttributeValue::S(id))
             .send()
             .await?;
@@ -334,7 +360,7 @@ impl DynamoDB {
         Ok(Some(Self::map_item_to_challenge_item(item)))
     }
 
-    pub async fn get_all_by_quest_id(
+    pub async fn get_challenges_by_quest_id(
         &self,
         quest_id: String,
     ) -> anyhow::Result<Vec<ChallengeItem>> {
@@ -354,6 +380,40 @@ impl DynamoDB {
             .map(Self::map_item_to_challenge_item)
             .collect::<Vec<ChallengeItem>>();
         Ok(challenges)
+    }
+
+    pub async fn update_challenge(&self, item: ChallengeItem) -> anyhow::Result<()> {
+        self.client
+            .update_item()
+            .table_name(Self::CHALLENGE_TABLE_NAME)
+            .key("QuestId", AttributeValue::S(item.quest_id))
+            .key("ChallengeId", AttributeValue::S(item.id))
+            .update_expression(
+                "SET ChallengeTitle = :title, ChallengeDescription = :description, ChallengeLat = :lat, ChallengeLon = :lon",
+            )
+            .expression_attribute_values(
+                ":title", AttributeValue::S(item.title))
+            .expression_attribute_values(
+                ":description", AttributeValue::S(item.description))
+            .expression_attribute_values(
+                ":lat", AttributeValue::N(item.lat.to_string()))
+            .expression_attribute_values(
+                ":lon", AttributeValue::N(item.lon.to_string()),
+            )
+            .send()
+            .await?;
+        Ok(())
+    }
+
+    pub async fn delete_challenge(&self, id: String, quest_id: String) -> anyhow::Result<()> {
+        self.client
+            .delete_item()
+            .table_name(Self::CHALLENGE_TABLE_NAME)
+            .key("QuestId", AttributeValue::S(quest_id))
+            .key("ChallengeId", AttributeValue::S(id))
+            .send()
+            .await?;
+        Ok(())
     }
 }
 
@@ -390,7 +450,7 @@ mod tests {
         let queried_quest = db.get_quest_by_id(quest.id.clone()).await.unwrap();
         assert_eq!(queried_quest, Some(quest.clone()));
 
-        let queried_quests = db.get_all().await.unwrap();
+        let queried_quests = db.get_quests().await.unwrap();
         assert_eq!(queried_quests.len(), 1);
         assert_eq!(queried_quests[0], quest);
 
@@ -406,5 +466,136 @@ mod tests {
         db.delete_quest(updated_quest.id.clone()).await.unwrap();
         let queried_quest = db.get_quest_by_id(updated_quest.id.clone()).await.unwrap();
         assert_eq!(queried_quest, None);
+    }
+
+    #[tokio::test]
+    async fn test_user_crud() {
+        let db = create_client().await;
+
+        let user = UserItem {
+            id: "test-user".to_string(),
+            name: "Test User".to_string(),
+            email: "hoge@nouse.ink".to_string(),
+            hashed_password: "hogehoge".to_string(),
+        };
+        db.put_user(user.clone()).await.unwrap();
+
+        let queried_user = db.get_user_by_id(user.id.clone()).await.unwrap();
+        assert_eq!(queried_user, Some(user.clone()));
+
+        let queried_by_email_user = db.get_user_by_email(user.email.clone()).await.unwrap();
+        assert_eq!(queried_by_email_user, Some(user.clone()));
+
+        let updated_user = UserItem {
+            name: "Updated User".to_string(),
+            ..user
+        };
+        db.update_user(updated_user.clone()).await.unwrap();
+
+        let queried_user = db.get_user_by_id(updated_user.id.clone()).await.unwrap();
+        assert_eq!(queried_user, Some(updated_user.clone()));
+
+        db.delete_user(updated_user.id.clone()).await.unwrap();
+        let queried_user = db.get_user_by_id(updated_user.id.clone()).await.unwrap();
+        assert_eq!(queried_user, None);
+    }
+
+    #[tokio::test]
+    async fn test_challenge_crud() {
+        let db = create_client().await;
+
+        let challenge = ChallengeItem {
+            id: "test-challenge".to_string(),
+            quest_id: "test-quest".to_string(),
+            title: "Test Challenge".to_string(),
+            description: "This is a test challenge".to_string(),
+            lat: 35.681236,
+            lon: 139.767125,
+        };
+        db.put_challenge(challenge.clone()).await.unwrap();
+
+        let queried_challenge = db
+            .get_challenge_by_id_and_quest_id(challenge.id.clone(), challenge.quest_id.clone())
+            .await
+            .unwrap();
+        assert_eq!(queried_challenge, Some(challenge.clone()));
+
+        let queried_challenges = db
+            .get_challenges_by_quest_id(challenge.quest_id.clone())
+            .await
+            .unwrap();
+        assert_eq!(queried_challenges.len(), 1);
+        assert_eq!(queried_challenges[0], challenge);
+
+        let updated_challenge = ChallengeItem {
+            title: "Updated Challenge".to_string(),
+            ..challenge
+        };
+        db.update_challenge(updated_challenge.clone())
+            .await
+            .unwrap();
+
+        let queried_challenge = db
+            .get_challenge_by_id_and_quest_id(
+                updated_challenge.id.clone(),
+                updated_challenge.quest_id.clone(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(queried_challenge, Some(updated_challenge.clone()));
+
+        db.delete_challenge(updated_challenge.id.clone(), updated_challenge.quest_id.clone())
+            .await
+            .unwrap();
+        let queried_challenge = db
+            .get_challenge_by_id_and_quest_id(
+                updated_challenge.id.clone(),
+                updated_challenge.quest_id.clone(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(queried_challenge, None);
+    }
+
+    // 同じQuestIdを持つChallengeを複数作成できることを確認するテスト
+    #[tokio::test]
+    async fn test_create_multiple_challenge() {
+        let db = create_client().await;
+
+        // Generate random quest id
+        let quest_id = nanoid::nanoid!();
+
+        let challenge1 = ChallengeItem {
+            id: "test-challenge-1".to_string(),
+            quest_id: quest_id.clone(),
+            title: "Test Challenge 1".to_string(),
+            description: "This is a test challenge 1".to_string(),
+            lat: 35.681236,
+            lon: 139.767125,
+        };
+        db.put_challenge(challenge1.clone()).await.unwrap();
+
+        let challenge2 = ChallengeItem {
+            id: "test-challenge-2".to_string(),
+            quest_id: quest_id.clone(),
+            title: "Test Challenge 2".to_string(),
+            description: "This is a test challenge 2".to_string(),
+            lat: 35.681236,
+            lon: 139.767125,
+        };
+        db.put_challenge(challenge2.clone()).await.unwrap();
+
+        let queried_challenges = db.get_challenges_by_quest_id(quest_id).await.unwrap();
+        assert_eq!(queried_challenges.len(), 2);
+        assert_eq!(queried_challenges[0], challenge1);
+        assert_eq!(queried_challenges[1], challenge2);
+
+        // 後片付け
+        db.delete_challenge(challenge1.id.clone(), challenge1.quest_id.clone())
+            .await
+            .unwrap();
+        db.delete_challenge(challenge2.id.clone(), challenge2.quest_id.clone())
+            .await
+            .unwrap();
     }
 }
