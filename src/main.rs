@@ -97,13 +97,26 @@ fn create_app<
         )
 }
 
+#[derive(Clone)]
+pub struct UserHandlerState<T: UserRepository> {
+    user_repository: Arc<T>,
+    secret_key: String,
+}
+
 fn create_user_routes<T: UserRepository>(user_repository: T) -> Router {
+    dotenv().ok();
+    let secret_key = &env::var("JWT_SECRET_KEY").expect("undefined [JWT_SECRET_KEY]");
+    let user_state = UserHandlerState {
+        user_repository: Arc::new(user_repository),
+        secret_key: secret_key.to_string(),
+    };
+
     Router::new()
         .route("/register", post(register_user::<T>))
         .route("/login", post(login_user::<T>))
         .route("/users/:id", get(find_user::<T>).delete(delete_user::<T>))
         .route("/user/auth", get(auth_user::<T>))
-        .layer(Extension(Arc::new(user_repository)))
+        .layer(Extension(user_state))
 }
 
 fn create_quest_routes<T: QuestRepository>(quest_repository: T) -> Router {

@@ -1,5 +1,3 @@
-use std::{env, sync::Arc};
-
 use axum::{
     extract::{Extension, Path},
     http::{header::SET_COOKIE, StatusCode},
@@ -13,16 +11,18 @@ use dotenv::dotenv;
 use crate::{
     repositories::user::{LoginUser, RegisterUser, UserRepository},
     services::user::{create_jwt, decode_jwt},
+    UserHandlerState,
 };
 
 pub async fn register_user<T: UserRepository>(
     Json(payload): Json<RegisterUser>,
-    Extension(repository): Extension<Arc<T>>,
+    Extension(state): Extension<UserHandlerState<T>>,
 ) -> Result<impl IntoResponse, StatusCode> {
     dotenv().ok();
-    let secret_key = &env::var("JWT_SECRET_KEY").expect("undefined [JWT_SECRET_KEY]");
+    let secret_key = state.secret_key;
 
-    let user = repository
+    let user = state
+        .user_repository
         .register(payload)
         .await
         .or(Err(StatusCode::NOT_FOUND))?;
@@ -50,12 +50,13 @@ pub async fn register_user<T: UserRepository>(
 
 pub async fn login_user<T: UserRepository>(
     Json(payload): Json<LoginUser>,
-    Extension(repository): Extension<Arc<T>>,
+    Extension(state): Extension<UserHandlerState<T>>,
 ) -> Result<impl IntoResponse, StatusCode> {
     dotenv().ok();
-    let secret_key = &env::var("JWT_SECRET_KEY").expect("undefined [JWT_SECRET_KEY]");
+    let secret_key = state.secret_key;
 
-    let user = repository
+    let user = state
+        .user_repository
         .login(payload)
         .await
         .or(Err(StatusCode::NOT_FOUND))?;
@@ -83,18 +84,23 @@ pub async fn login_user<T: UserRepository>(
 
 pub async fn find_user<T: UserRepository>(
     Path(id): Path<String>,
-    Extension(repository): Extension<Arc<T>>,
+    Extension(state): Extension<UserHandlerState<T>>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let user = repository.find(id).await.or(Err(StatusCode::NOT_FOUND))?;
+    let user = state
+        .user_repository
+        .find(id)
+        .await
+        .or(Err(StatusCode::NOT_FOUND))?;
 
     Ok((StatusCode::CREATED, Json(user)))
 }
 
 pub async fn delete_user<T: UserRepository>(
     Path(id): Path<String>,
-    Extension(repository): Extension<Arc<T>>,
+    Extension(state): Extension<UserHandlerState<T>>,
 ) -> StatusCode {
-    repository
+    state
+        .user_repository
         .delete(id)
         .await
         .map(|_| StatusCode::NO_CONTENT)
@@ -123,15 +129,16 @@ impl IntoResponse for AuthError {
 
 pub async fn auth_user<T: UserRepository>(
     TypedHeader(cookie): TypedHeader<axum::headers::Cookie>,
-    Extension(user_repository): Extension<Arc<T>>,
+    Extension(state): Extension<UserHandlerState<T>>,
 ) -> Result<impl IntoResponse, AuthError> {
     if let Some(cookie_token) = cookie.get("session_token") {
         dotenv().ok();
-        let secret_key = &env::var("JWT_SECRET_KEY").expect("undefined [JWT_SECRET_KEY]");
+        let secret_key = &state.secret_key;
 
         let decoded_token = decode_jwt(cookie_token, &secret_key).unwrap();
 
-        let user = user_repository
+        let user = state
+            .user_repository
             .find(decoded_token.claims.user_id)
             .await
             .or(Err(AuthError::NotFoundUser))?;
