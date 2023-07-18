@@ -6,7 +6,6 @@ use axum::{
 };
 use chrono::{Duration, Utc};
 use cookie::{time::OffsetDateTime, Cookie, Expiration};
-use dotenv::dotenv;
 
 use crate::{
     repositories::user::{LoginUser, RegisterUser, UserRepository},
@@ -18,7 +17,6 @@ pub async fn register_user<T: UserRepository>(
     Json(payload): Json<RegisterUser>,
     Extension(state): Extension<UserHandlerState<T>>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    dotenv().ok();
     let secret_key = state.secret_key;
 
     let user = state
@@ -52,7 +50,6 @@ pub async fn login_user<T: UserRepository>(
     Json(payload): Json<LoginUser>,
     Extension(state): Extension<UserHandlerState<T>>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    dotenv().ok();
     let secret_key = state.secret_key;
 
     let user = state
@@ -132,7 +129,6 @@ pub async fn auth_user<T: UserRepository>(
     Extension(state): Extension<UserHandlerState<T>>,
 ) -> Result<impl IntoResponse, AuthError> {
     if let Some(cookie_token) = cookie.get("session_token") {
-        dotenv().ok();
         let secret_key = &state.secret_key;
 
         let decoded_token = decode_jwt(cookie_token, &secret_key).unwrap();
