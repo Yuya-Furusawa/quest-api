@@ -19,12 +19,14 @@ use crate::handlers::{
     challenge::{create_challenge, find_challenge, find_challenge_by_quest_id},
     quest::{all_quests, create_quest, delete_quest, find_quest, update_quest},
     user::{auth_user, delete_user, find_user, login_user, register_user},
+    user_challenge::complete_challenge,
     user_quest::participate_quest,
 };
 use crate::repositories::{
     challenge::{ChallengeRepository, ChallengeRepositoryForDb},
     quest::{QuestRepository, QuestRepositoryForDb},
     user::{UserRepository, UserRepositoryForDb},
+    user_challenge::{UserChallengeRepository, UserChallengeRepositoryForDb},
     user_quest::{UserQuestRepository, UserQuestRepositoryForDb},
 };
 
@@ -50,6 +52,7 @@ async fn main() {
         UserRepositoryForDb::new(pool.clone()),
         ChallengeRepositoryForDb::new(pool.clone()),
         UserQuestRepositoryForDb::new(pool.clone()),
+        UserChallengeRepositoryForDb::new(pool.clone()),
         secret_key,
     );
 
@@ -68,17 +71,20 @@ fn create_app<
     S: UserRepository,
     U: ChallengeRepository,
     P: UserQuestRepository,
+    Q: UserChallengeRepository,
 >(
     quest_repository: T,
     user_repository: S,
     challenge_repository: U,
     userquest_repository: P,
+    userchallenge_repository: Q,
     secret_key: String,
 ) -> Router {
     let user_routes = create_user_routes(user_repository, secret_key);
     let quest_routes = create_quest_routes(quest_repository);
     let challenge_routes = create_challenge_routes(challenge_repository);
     let userquest_routes = create_userquest_routes(userquest_repository);
+    let userchallenge_routes = create_challenge_routes(userchallenge_repository);
 
     let origins = [
         "http://localhost:5173".parse::<HeaderValue>().unwrap(),
@@ -93,6 +99,7 @@ fn create_app<
         .nest("/", quest_routes)
         .nest("/", challenge_routes)
         .nest("/", userquest_routes)
+        .nest("/", userchallenge_routes)
         .layer(
             CorsLayer::new()
                 .allow_origin(origins)
@@ -148,6 +155,12 @@ fn create_userquest_routes<T: UserQuestRepository>(userquest_repository: T) -> R
     Router::new()
         .route("/participate", post(participate_quest::<T>))
         .layer(Extension(Arc::new(userquest_repository)))
+}
+
+fn create_userchallenge_routes<T: UserChallengeRepository>(userchallenge_repository: T) -> Router {
+    Router::new()
+        .route("/complete", post(complete_challenge::<T>))
+        .layer(Extension(Arc::new(userchallenge_repository)))
 }
 
 async fn root() -> &'static str {
