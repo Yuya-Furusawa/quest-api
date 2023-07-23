@@ -10,7 +10,10 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
-use crate::repositories::quest::{Difficulty, QuestFromRow};
+use crate::repositories::{
+    challenge::Challenge,
+    quest::{Difficulty, QuestFromRow},
+};
 
 #[async_trait]
 pub trait UserRepository: Clone + std::marker::Send + std::marker::Sync + 'static {
@@ -94,11 +97,29 @@ impl UserRepository for UserRepositoryForDb {
             })
             .collect::<Vec<QuestFromRow>>();
 
+        let user_challenge = sqlx::query_as::<_, Challenge>(
+            r#"
+                select * from user_challenges where user_id=$1
+                returning *
+            "#,
+        )
+        .bind(user_row.id.clone())
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|_| Vec::<Challenge>::new())
+        .unwrap();
+
+        let challenges = user_challenge
+            .iter()
+            .map(|x| x.quest_id)
+            .collect::<Vec<String>>();
+
         let user = UserEntity {
             id: user_row.id.clone(),
             username: user_row.username.clone(),
             email: user_row.email.clone(),
             participate_quest: quests,
+            complete_challenge: challenges,
         };
 
         anyhow::Ok(user)
@@ -140,11 +161,29 @@ impl UserRepository for UserRepositoryForDb {
             })
             .collect::<Vec<QuestFromRow>>();
 
+        let user_challenge = sqlx::query_as::<_, Challenge>(
+            r#"
+                select * from user_challenges where user_id=$1
+                returning *
+            "#,
+        )
+        .bind(user_row.id.clone())
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|_| Vec::<Challenge>::new())
+        .unwrap();
+
+        let challenges = user_challenge
+            .iter()
+            .map(|x| x.quest_id)
+            .collect::<Vec<String>>();
+
         let user = UserEntity {
             id: user_row.id.clone(),
             username: user_row.username.clone(),
             email: user_row.email.clone(),
             participate_quest: quests,
+            complete_challenge: challenges,
         };
 
         anyhow::Ok(user)
@@ -152,6 +191,16 @@ impl UserRepository for UserRepositoryForDb {
 
     async fn delete(&self, id: String) -> anyhow::Result<()> {
         let tx = self.pool.begin().await?;
+
+        // user_challengesの削除
+        sqlx::query(
+            r#"
+                delete from user_challenges where use_id=$1
+            "#,
+        )
+        .bind(id.clone())
+        .execute(&self.pool)
+        .await?;
 
         // user_questsの削除
         sqlx::query(
@@ -284,6 +333,7 @@ pub struct UserEntity {
     pub username: String,
     pub email: String,
     pub participate_quest: Vec<QuestFromRow>,
+    pub complete_challenge: Vec<String>, // 達成したChallengeはidだけ持つ
 }
 
 impl UserEntity {
@@ -293,6 +343,7 @@ impl UserEntity {
             username,
             email,
             participate_quest: Vec::new(),
+            complete_challenge: Vec::new(),
         }
     }
 }
