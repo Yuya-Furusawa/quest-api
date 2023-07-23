@@ -185,6 +185,7 @@ mod test {
         challenge::{Challenge, ChallengeRepositoryForMemory, CreateChallenge},
         quest::{CreateQuest, Difficulty, QuestEntity, QuestRepositoryForMemory},
         user::{RegisterUser, UserEntity, UserRepositoryForMemory},
+        user_challenge::{CompleteChallenge, UserChallengeRepositoryForMemory},
         user_quest::{ParticipateQuest, UserQuestRepositoryForMemory},
     };
 
@@ -252,6 +253,16 @@ mod test {
             body
         ));
         challenge
+    }
+
+    async fn res_to_userchallenge(res: Response) -> CompleteChallenge {
+        let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
+        let body = String::from_utf8(bytes.to_vec()).unwrap();
+        let userchallenge: CompleteChallenge = serde_json::from_str(&body).expect(&format!(
+            "cannot convert CompleteChallenge instance. body: {}",
+            body
+        ));
+        userchallenge
     }
 
     #[tokio::test]
@@ -676,5 +687,33 @@ mod test {
             .expect(&format!("cannot convert Challenge instance. body {}", body));
 
         assert_eq!(vec![created_challenge], challenges)
+    }
+
+    #[tokio::test]
+    async fn should_complete_challenge() {
+        let expected = CompleteChallenge {
+            id: 1,
+            user_id: "test".to_string(),
+            challenge_id: "test".to_string(),
+        };
+
+        let req = build_req_with_json(
+            "/participate",
+            Method::POST,
+            r#"{
+                "user_id": "test",
+                "quest_id": "test"
+            }"#
+            .to_string(),
+        );
+
+        let res = create_challenge_routes(UserChallengeRepositoryForMemory::new())
+            .oneshot(req)
+            .await
+            .unwrap();
+
+        let result = res_to_userchallenge(res).await;
+
+        assert_eq!(expected, result)
     }
 }

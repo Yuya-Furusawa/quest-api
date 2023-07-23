@@ -1,11 +1,15 @@
 use axum::async_trait;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
-use std::marker::{Send, Sync};
+use std::{
+    collections::HashMap,
+    marker::{Send, Sync},
+    sync::{Arc, RwLock, RwLockWriteGuard},
+};
 
 #[async_trait]
 pub trait UserChallengeRepository: Clone + Send + Sync + 'static {
-    async fn complete_challnge(
+    async fn complete_challenge(
         &self,
         payload: CompleteChallengePayload,
     ) -> anyhow::Result<CompleteChallenge>;
@@ -24,7 +28,7 @@ impl UserChallengeRepositoryForDb {
 
 #[async_trait]
 impl UserChallengeRepository for UserChallengeRepositoryForDb {
-    async fn complete_challnge(
+    async fn complete_challenge(
         &self,
         payload: CompleteChallengePayload,
     ) -> anyhow::Result<CompleteChallenge> {
@@ -43,7 +47,45 @@ impl UserChallengeRepository for UserChallengeRepositoryForDb {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, FromRow)]
+type UserChallengeDatas = HashMap<i32, CompleteChallenge>;
+
+#[derive(Debug, Clone)]
+pub struct UserChallengeRepositoryForMemory {
+    store: Arc<RwLock<UserChallengeDatas>>,
+}
+
+impl UserChallengeRepositoryForMemory {
+    #[cfg(test)]
+    pub fn new() -> Self {
+        Self {
+            store: Arc::default(),
+        }
+    }
+
+    fn write_store_ref(&self) -> RwLockWriteGuard<UserChallengeDatas> {
+        self.store.write().unwrap()
+    }
+}
+
+#[async_trait]
+impl UserChallengeRepository for UserChallengeRepositoryForMemory {
+    async fn complete_challenge(
+        &self,
+        payload: CompleteChallengePayload,
+    ) -> anyhow::Result<CompleteChallenge> {
+        let mut store = self.write_store_ref();
+        let id = (store.len()) as i32;
+        let complete_challenge = CompleteChallenge {
+            id: id.clone(),
+            user_id: payload.user_id,
+            challenge_id: payload.challenge_id,
+        };
+        store.insert(id, complete_challenge.clone());
+        anyhow::Ok(complete_challenge)
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, FromRow, PartialEq)]
 pub struct CompleteChallenge {
     pub id: i32,
     pub user_id: String,
