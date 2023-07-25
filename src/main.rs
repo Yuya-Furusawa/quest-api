@@ -33,7 +33,7 @@ async fn main() {
 
     dotenv().ok();
     let database_url = &env::var("DATABASE_URL").expect("undefined [DATABASE_URL]");
-    let secret_key = &env::var("JWT_SECRET_KEY").expect("undefined [JWT_SECRET_KEY]");
+    let secret_key = env::var("JWT_SECRET_KEY").expect("undefined [JWT_SECRET_KEY]");
 
     let pool = PgPool::connect(database_url)
         .await
@@ -49,7 +49,7 @@ async fn main() {
         UserRepositoryForDb::new(pool.clone()),
         ChallengeRepositoryForDb::new(pool.clone()),
         UserQuestRepositoryForDb::new(pool.clone()),
-        secret_key.to_string(),
+        secret_key,
     );
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
@@ -110,7 +110,7 @@ pub struct UserHandlerState<T: UserRepository> {
 fn create_user_routes<T: UserRepository>(user_repository: T, secret_key: String) -> Router {
     let user_state = UserHandlerState {
         user_repository: Arc::new(user_repository),
-        secret_key: secret_key.to_string(),
+        secret_key,
     };
 
     Router::new()
