@@ -33,6 +33,8 @@ async fn main() {
 
     dotenv().ok();
     let database_url = &env::var("DATABASE_URL").expect("undefined [DATABASE_URL]");
+    let secret_key = &env::var("JWT_SECRET_KEY").expect("undefined [JWT_SECRET_KEY]");
+
     let pool = PgPool::connect(database_url)
         .await
         .expect(&format!("fail connect database, url is [{}]", database_url));
@@ -47,6 +49,7 @@ async fn main() {
         UserRepositoryForDb::new(pool.clone()),
         ChallengeRepositoryForDb::new(pool.clone()),
         UserQuestRepositoryForDb::new(pool.clone()),
+        secret_key.to_string(),
     );
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
@@ -69,8 +72,9 @@ fn create_app<
     user_repository: S,
     challenge_repository: U,
     userquest_repository: P,
+    secret_key: String,
 ) -> Router {
-    let user_routes = create_user_routes(user_repository);
+    let user_routes = create_user_routes(user_repository, secret_key);
     let quest_routes = create_quest_routes(quest_repository);
     let challenge_routes = create_challenge_routes(challenge_repository);
     let userquest_routes = create_userquest_routes(userquest_repository);
@@ -103,9 +107,7 @@ pub struct UserHandlerState<T: UserRepository> {
     secret_key: String,
 }
 
-fn create_user_routes<T: UserRepository>(user_repository: T) -> Router {
-    dotenv().ok();
-    let secret_key = &env::var("JWT_SECRET_KEY").expect("undefined [JWT_SECRET_KEY]");
+fn create_user_routes<T: UserRepository>(user_repository: T, secret_key: String) -> Router {
     let user_state = UserHandlerState {
         user_repository: Arc::new(user_repository),
         secret_key: secret_key.to_string(),
@@ -449,7 +451,9 @@ mod test {
             .to_string(),
         );
 
-        let res = create_user_routes(user_repository)
+        let secret_key = "secret_key".to_string();
+
+        let res = create_user_routes(user_repository, secret_key)
             .oneshot(req)
             .await
             .expect("failed to register user");
@@ -482,7 +486,9 @@ mod test {
             .to_string(),
         );
 
-        let res = create_user_routes(user_repository)
+        let secret_key = "secret_key".to_string();
+
+        let res = create_user_routes(user_repository, secret_key)
             .oneshot(req)
             .await
             .expect("failed to login user");
@@ -506,7 +512,10 @@ mod test {
 
         let req_path = format!("{}{}", "/users/", created_user.id);
         let req = build_req_with_empty(&req_path, Method::GET);
-        let res = create_user_routes(user_repository)
+
+        let secret_key = "secret_key".to_string();
+
+        let res = create_user_routes(user_repository, secret_key)
             .oneshot(req)
             .await
             .expect("failed to find user");
@@ -529,7 +538,10 @@ mod test {
 
         let req_path = format!("{}{}", "/users/", creared_user.id);
         let req = build_req_with_empty(&req_path, Method::DELETE);
-        let res = create_user_routes(user_repository)
+
+        let secret_key = "secret_key".to_string();
+
+        let res = create_user_routes(user_repository, secret_key)
             .oneshot(req)
             .await
             .unwrap();
