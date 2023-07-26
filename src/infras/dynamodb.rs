@@ -417,6 +417,52 @@ impl DynamoDB {
     }
 }
 
+/*
+ * ==============
+ * "user_completed_challenges" Table
+ * ==============
+ */
+impl DynamoDB {
+    pub const USER_COMPLETED_CHALLENGES_TABLE_NAME: &'static str = "user_completed_challenges";
+
+    pub async fn put_user_complete_challenge(
+        &self,
+        user_id: String,
+        challenge_id: String,
+    ) -> anyhow::Result<()> {
+        self.client
+            .put_item()
+            .table_name(Self::USER_COMPLETED_CHALLENGES_TABLE_NAME)
+            .item("UserId", AttributeValue::S(user_id))
+            .item("ChallengeId", AttributeValue::S(challenge_id))
+            .send()
+            .await?;
+        Ok(())
+    }
+
+    pub async fn query_user_complete_challenge_ids(
+        &self,
+        user_id: String,
+    ) -> anyhow::Result<Vec<String>> {
+        let result = self
+            .client
+            .query()
+            .table_name(Self::USER_COMPLETED_CHALLENGES_TABLE_NAME)
+            .key_condition_expression("UserId = :user_id")
+            .expression_attribute_values(":user_id", AttributeValue::S(user_id))
+            .send()
+            .await?;
+        let Some(items) = result.items() else {
+            return Ok(Vec::new());
+        };
+        let challenge_ids = items
+            .iter()
+            .map(|item| item.get("ChallengeId").unwrap().as_s().unwrap().clone())
+            .collect::<Vec<String>>();
+        Ok(challenge_ids)
+    }
+}
+
 /// 実行前にdocker composeでdynamodb-localを起動しておく必要がある
 #[cfg(all(test, feature = "db-tests"))]
 mod tests {
@@ -544,9 +590,12 @@ mod tests {
             .unwrap();
         assert_eq!(queried_challenge, Some(updated_challenge.clone()));
 
-        db.delete_challenge(updated_challenge.id.clone(), updated_challenge.quest_id.clone())
-            .await
-            .unwrap();
+        db.delete_challenge(
+            updated_challenge.id.clone(),
+            updated_challenge.quest_id.clone(),
+        )
+        .await
+        .unwrap();
         let queried_challenge = db
             .get_challenge_by_id_and_quest_id(
                 updated_challenge.id.clone(),
