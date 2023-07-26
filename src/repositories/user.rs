@@ -97,7 +97,7 @@ impl UserRepository for UserRepositoryForDb {
             })
             .collect::<Vec<QuestFromRow>>();
 
-        let user_challenge = sqlx::query_as::<_, Challenge>(
+        let user_challenge = sqlx::query_as::<_, UserChallengeFromRow>(
             r#"
                 select * from user_challenges where user_id=$1
                 returning *
@@ -111,7 +111,7 @@ impl UserRepository for UserRepositoryForDb {
 
         let challenges = user_challenge
             .iter()
-            .map(|x| x.quest_id)
+            .map(|x| x.challenge_id.clone())
             .collect::<Vec<String>>();
 
         let user = UserEntity {
@@ -161,21 +161,21 @@ impl UserRepository for UserRepositoryForDb {
             })
             .collect::<Vec<QuestFromRow>>();
 
-        let user_challenge = sqlx::query_as::<_, Challenge>(
+        let user_challenge = sqlx::query_as::<_, UserChallengeFromRow>(
             r#"
                 select * from user_challenges where user_id=$1
                 returning *
             "#,
         )
-        .bind(user_row.id.clone())
+        .bind(id.clone())
         .fetch_all(&self.pool)
         .await
-        .map_err(|_| Vec::<Challenge>::new())
+        .map_err(|_| Vec::<UserChallengeFromRow>::new())
         .unwrap();
 
         let challenges = user_challenge
             .iter()
-            .map(|x| x.quest_id)
+            .map(|x| x.challenge_id.clone())
             .collect::<Vec<String>>();
 
         let user = UserEntity {
@@ -325,6 +325,14 @@ struct UserWithQuestFromRow {
     difficulty: Difficulty,
     num_participate: i32,
     num_clear: i32,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, FromRow)]
+struct UserChallengeFromRow {
+    id: i32,
+    user_id: String,
+    challenge_id: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
