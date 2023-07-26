@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  localstack:
+    container_name: localstack_main
+    image: localstack/localstack
+    ports:
+      - "127.0.0.1:4566:4566"            # LocalStack Gateway
+      - "127.0.0.1:4510-4559:4510-4559"  # external services port range
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock" # Lambdaを利用するために必要（コンテナ内のDockerがホストのDockerにアクセスできるようになる）
+    healthcheck:
+      test: curl http://localhost:4566/_localstack/health
+      interval: 2s
+      start_period: 20s
+      retries: 30
+      timeout: 30s
+  terraform:
+    image: hashicorp/terraform:1.5.0
+    volumes:
+      - ./terraform:/workdir
+    working_dir: /workdir/local
+    entrypoint: /bin/sh
+    command: -c "terraform init && terraform apply -auto-approve -state-out=/tmp/terraform.tfstate"
+    depends_on:
+      localstack:
+        condition: service_healthy
