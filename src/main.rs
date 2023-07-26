@@ -84,7 +84,7 @@ fn create_app<
     let quest_routes = create_quest_routes(quest_repository);
     let challenge_routes = create_challenge_routes(challenge_repository);
     let userquest_routes = create_userquest_routes(userquest_repository);
-    let userchallenge_routes = create_challenge_routes(userchallenge_repository);
+    let userchallenge_routes = create_userchallenge_routes(userchallenge_repository);
 
     let origins = [
         "http://localhost:5173".parse::<HeaderValue>().unwrap(),
@@ -707,7 +707,7 @@ mod test {
             .to_string(),
         );
 
-        let res = create_challenge_routes(UserChallengeRepositoryForMemory::new())
+        let res = create_userchallenge_routes(UserChallengeRepositoryForMemory::new())
             .oneshot(req)
             .await
             .unwrap();
