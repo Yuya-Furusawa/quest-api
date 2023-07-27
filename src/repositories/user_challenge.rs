@@ -34,8 +34,8 @@ impl UserChallengeRepository for UserChallengeRepositoryForDb {
     ) -> anyhow::Result<CompleteChallenge> {
         let row = sqlx::query_as::<_, CompleteChallenge>(
             r#"
-				insert into user_challenges (user_id, challenge_id) values ($1, $2)
-				returning *
+                insert into user_challenges (user_id, challenge_id) values ($1, $2)
+                returning *
 			"#,
         )
         .bind(payload.user_id)
