@@ -100,7 +100,6 @@ impl UserRepository for UserRepositoryForDb {
         let user_challenge = sqlx::query_as::<_, UserChallengeFromRow>(
             r#"
                 select * from user_challenges where user_id=$1
-                returning *
             "#,
         )
         .bind(user_row.id.clone())
@@ -164,7 +163,6 @@ impl UserRepository for UserRepositoryForDb {
         let user_challenge = sqlx::query_as::<_, UserChallengeFromRow>(
             r#"
                 select * from user_challenges where user_id=$1
-                returning *
             "#,
         )
         .bind(id.clone())
