@@ -74,7 +74,7 @@ impl UserChallengeRepository for UserChallengeRepositoryForMemory {
         payload: CompleteChallengePayload,
     ) -> anyhow::Result<CompleteChallenge> {
         let mut store = self.write_store_ref();
-        let id = (store.len()) as i32;
+        let id = (store.len() + 1) as i32;
         let complete_challenge = CompleteChallenge {
             id: id.clone(),
             user_id: payload.user_id,

@@ -698,11 +698,11 @@ mod test {
         };
 
         let req = build_req_with_json(
-            "/participate",
+            "/complete",
             Method::POST,
             r#"{
                 "user_id": "test",
-                "quest_id": "test"
+                "challenge_id": "test"
             }"#
             .to_string(),
         );
