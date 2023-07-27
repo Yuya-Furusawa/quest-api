@@ -71,3 +71,27 @@ resource "aws_dynamodb_table" "challenges" {
     type = "S"
   }
 }
+
+resource " aws_dynamodb_table" "user_completed_challenges" {
+  name         = "user_completed_challenges"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "UserId"
+  range_key    = "ChallengeId"
+
+  attribute {
+    name = "UserId"
+    type = "S"
+  }
+
+  attribute {
+    name = "ChallengeId"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name               = "ChallengeUserIndex"
+    hash_key           = "ChallengeId"
+    range_key          = "UserId"
+    projection_type    = "ALL"
+  }
+}
