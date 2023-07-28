@@ -9,7 +9,7 @@ use std::{
 
 #[async_trait]
 pub trait UserChallengeRepository: Clone + Send + Sync + 'static {
-    async fn complete_challenge(
+    async fn save_challenge_complete_event(
         &self,
         payload: CompleteChallengePayload,
     ) -> anyhow::Result<CompleteChallenge>;
@@ -28,7 +28,7 @@ impl UserChallengeRepositoryForDb {
 
 #[async_trait]
 impl UserChallengeRepository for UserChallengeRepositoryForDb {
-    async fn complete_challenge(
+    async fn save_challenge_complete_event(
         &self,
         payload: CompleteChallengePayload,
     ) -> anyhow::Result<CompleteChallenge> {
@@ -69,7 +69,7 @@ impl UserChallengeRepositoryForMemory {
 
 #[async_trait]
 impl UserChallengeRepository for UserChallengeRepositoryForMemory {
-    async fn complete_challenge(
+    async fn save_challenge_complete_event(
         &self,
         payload: CompleteChallengePayload,
     ) -> anyhow::Result<CompleteChallenge> {

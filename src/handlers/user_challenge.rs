@@ -8,7 +8,7 @@ pub async fn complete_challenge<T: UserChallengeRepository>(
     Extension(repository): Extension<Arc<T>>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let row = repository
-        .complete_challenge(payload)
+        .save_challenge_complete_event(payload)
         .await
         .or(Err(StatusCode::BAD_REQUEST))?;
 
