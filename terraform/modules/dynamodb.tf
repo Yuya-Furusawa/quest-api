@@ -72,7 +72,7 @@ resource "aws_dynamodb_table" "challenges" {
   }
 }
 
-resource " aws_dynamodb_table" "user_completed_challenges" {
+resource "aws_dynamodb_table" "user_completed_challenges" {
   name         = "user_completed_challenges"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "UserId"
