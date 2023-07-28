@@ -36,7 +36,7 @@ impl UserChallengeRepository for UserChallengeRepositoryForDb {
             r#"
                 insert into user_challenges (user_id, challenge_id) values ($1, $2)
                 returning *
-			"#,
+            "#,
         )
         .bind(payload.user_id)
         .bind(payload.challenge_id)
