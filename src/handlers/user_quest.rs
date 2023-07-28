@@ -8,7 +8,7 @@ pub async fn participate_quest<T: UserQuestRepository>(
     Extension(repository): Extension<Arc<T>>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let row = repository
-        .participate_quest(payload)
+        .save_quest_participate_event(payload)
         .await
         .or(Err(StatusCode::BAD_REQUEST))?;
 

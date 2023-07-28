@@ -8,7 +8,7 @@ use std::{
 
 #[async_trait]
 pub trait UserQuestRepository: Clone + std::marker::Send + std::marker::Sync + 'static {
-    async fn participate_quest(
+    async fn save_quest_participate_event(
         &self,
         payload: ParticipateQuestPayload,
     ) -> anyhow::Result<ParticipateQuest>;
@@ -27,7 +27,7 @@ impl UserQuestRepositoryForDb {
 
 #[async_trait]
 impl UserQuestRepository for UserQuestRepositoryForDb {
-    async fn participate_quest(
+    async fn save_quest_participate_event(
         &self,
         payload: ParticipateQuestPayload,
     ) -> anyhow::Result<ParticipateQuest> {
@@ -68,7 +68,7 @@ impl UserQuestRepositoryForMemory {
 
 #[async_trait]
 impl UserQuestRepository for UserQuestRepositoryForMemory {
-    async fn participate_quest(
+    async fn save_quest_participate_event(
         &self,
         payload: ParticipateQuestPayload,
     ) -> anyhow::Result<ParticipateQuest> {
