@@ -48,7 +48,7 @@ impl UserRepository for UserRepositoryForDb {
         .fetch_one(&self.pool)
         .await?;
 
-        let user = UserEntity::new(row.id, row.username, row.email, row.password);
+        let user = UserEntity::new(row.id, row.username, row.email);
 
         anyhow::Ok(user)
     }
@@ -98,7 +98,6 @@ impl UserRepository for UserRepositoryForDb {
             id: user_row.id.clone(),
             username: user_row.username.clone(),
             email: user_row.email.clone(),
-            password: user_row.password.clone(),
             participate_quest: quests,
         };
 
@@ -145,7 +144,6 @@ impl UserRepository for UserRepositoryForDb {
             id: user_row.id.clone(),
             username: user_row.username.clone(),
             email: user_row.email.clone(),
-            password: user_row.password.clone(),
             participate_quest: quests,
         };
 
@@ -181,7 +179,7 @@ impl UserRepository for UserRepositoryForDb {
     }
 }
 
-type UserDatas = HashMap<String, UserEntity>;
+type UserDatas = HashMap<String, UserFromRow>;
 
 #[derive(Debug, Clone)]
 pub struct UserRepositoryForMemory {
@@ -210,31 +208,44 @@ impl UserRepository for UserRepositoryForMemory {
     async fn register(&self, payload: RegisterUser) -> anyhow::Result<UserEntity> {
         let mut store = self.write_store_ref();
         let id = nanoid!();
-        let user = UserEntity::new(
-            id.clone(),
-            payload.username,
-            payload.email,
-            payload.password,
-        );
+        let user = UserFromRow {
+            id: id.clone(),
+            username: payload.username,
+            email: payload.email,
+            password: payload.password,
+        };
         store.insert(id, user.clone());
-        anyhow::Ok(user)
+        Ok(UserEntity {
+            id: user.id.clone(),
+            username: user.username.clone(),
+            email: user.email.clone(),
+            participate_quest: vec![],
+        })
     }
 
     async fn login(&self, payload: LoginUser) -> anyhow::Result<UserEntity> {
         let store = self.read_store_ref();
-        let user_vec = store
+        let user = store
             .values()
-            .filter(|user| (**user).email == payload.email && (**user).password == payload.password)
-            .map(|user| user.clone())
-            .collect::<Vec<UserEntity>>();
-        let user = user_vec.get(0).unwrap();
-        anyhow::Ok(user.clone())
+            .find(|user| (**user).email == payload.email && (**user).password == payload.password)
+            .ok_or_else(|| anyhow::Error::msg("not found"))?;
+        Ok(UserEntity {
+            id: user.id.clone(),
+            username: user.username.clone(),
+            email: user.email.clone(),
+            participate_quest: vec![],
+        })
     }
 
     async fn find(&self, id: String) -> anyhow::Result<UserEntity> {
         let store = self.read_store_ref();
         let user = store.get(&id).map(|user| user.clone()).unwrap();
-        anyhow::Ok(user)
+        Ok(UserEntity {
+            id: user.id.clone(),
+            username: user.username.clone(),
+            email: user.email.clone(),
+            participate_quest: vec![],
+        })
     }
 
     async fn delete(&self, id: String) -> anyhow::Result<()> {
@@ -272,29 +283,26 @@ pub struct UserEntity {
     pub id: String,
     pub username: String,
     pub email: String,
-    pub password: String,
     pub participate_quest: Vec<QuestFromRow>,
 }
 
 impl UserEntity {
-    pub fn new(id: String, username: String, email: String, password: String) -> Self {
+    pub fn new(id: String, username: String, email: String) -> Self {
         Self {
             id,
             username,
             email,
-            password,
             participate_quest: Vec::new(),
         }
     }
 }
 
-// usernameとemailとpasswordが一致したときは==とみなす
+// usernameとemailが一致したときは==とみなす
 // idと参加クエストが違っても同じユーザー
 impl PartialEq for UserEntity {
     fn eq(&self, other: &UserEntity) -> bool {
         (self.username == other.username)
             && (self.email == other.email)
-            && (self.password == other.password)
     }
 }
 
