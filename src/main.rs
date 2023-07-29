@@ -163,7 +163,7 @@ mod test {
         http::{header, Method, Request},
         response::Response,
     };
-    use http::{header::COOKIE, HeaderMap};
+    use http::{header::SET_COOKIE, HeaderMap};
     use hyper::{self, StatusCode};
     use nanoid::nanoid;
     use tower::ServiceExt;
@@ -462,7 +462,7 @@ mod test {
         let (user, header_map) = res_to_usercookie(res).await;
 
         assert_eq!(expected, user);
-        assert!(header_map.contains_key(COOKIE));
+        assert!(header_map.contains_key(SET_COOKIE));
     }
 
     #[tokio::test]
@@ -496,7 +496,7 @@ mod test {
         let (user, header_map) = res_to_usercookie(res).await;
 
         assert_eq!(created_user, user);
-        assert!(header_map.contains_key(COOKIE));
+        assert!(header_map.contains_key(SET_COOKIE));
     }
 
     #[tokio::test]
