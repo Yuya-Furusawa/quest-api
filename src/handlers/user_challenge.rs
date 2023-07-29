@@ -1,16 +1,16 @@
 use axum::{extract::Extension, http::StatusCode, response::IntoResponse, Json};
 use std::sync::Arc;
 
-use crate::repositories::user_challenge::{CompleteChallengePayload, UserChallengeRepository};
+use crate::repositories::user_challenge::{CompleteChallenge, UserChallengeRepository};
 
 pub async fn complete_challenge<T: UserChallengeRepository>(
-    Json(payload): Json<CompleteChallengePayload>,
+    Json(payload): Json<CompleteChallenge>,
     Extension(repository): Extension<Arc<T>>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let row = repository
+    repository
         .save_challenge_complete_event(payload)
         .await
         .or(Err(StatusCode::BAD_REQUEST))?;
 
-    Ok((StatusCode::CREATED, Json(row)))
+    Ok(StatusCode::CREATED)
 }

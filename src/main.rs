@@ -235,16 +235,6 @@ mod test {
         (user, header_map)
     }
 
-    async fn res_to_userquest(res: Response) -> ParticipateQuest {
-        let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
-        let body = String::from_utf8(bytes.to_vec()).unwrap();
-        let userquest: ParticipateQuest = serde_json::from_str(&body).expect(&format!(
-            "cannot convert ParticipateQuest instance. body: {}",
-            body
-        ));
-        userquest
-    }
-
     async fn res_to_challenge(res: Response) -> Challenge {
         let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
         let body = String::from_utf8(bytes.to_vec()).unwrap();
@@ -253,16 +243,6 @@ mod test {
             body
         ));
         challenge
-    }
-
-    async fn res_to_userchallenge(res: Response) -> CompleteChallenge {
-        let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
-        let body = String::from_utf8(bytes.to_vec()).unwrap();
-        let userchallenge: CompleteChallenge = serde_json::from_str(&body).expect(&format!(
-            "cannot convert CompleteChallenge instance. body: {}",
-            body
-        ));
-        userchallenge
     }
 
     #[tokio::test]
@@ -575,6 +555,8 @@ mod test {
 
     #[tokio::test]
     async fn should_participate_quest() {
+        let repository = UserQuestRepositoryForMemory::new();
+
         let expected = ParticipateQuest {
             user_id: "test".to_string(),
             quest_id: "test".to_string(),
@@ -590,14 +572,14 @@ mod test {
             .to_string(),
         );
 
-        let res = create_userquest_routes(UserQuestRepositoryForMemory::new())
+        create_userquest_routes(repository.clone())
             .oneshot(req)
             .await
             .unwrap();
 
-        let result = res_to_userquest(res).await;
+        let result = repository.read_stored_value();
 
-        assert_eq!(expected, result)
+        assert_eq!(expected, result[0])
     }
 
     #[tokio::test]
@@ -690,6 +672,8 @@ mod test {
 
     #[tokio::test]
     async fn should_complete_challenge() {
+        let repository = UserChallengeRepositoryForMemory::new();
+
         let expected = CompleteChallenge {
             user_id: "test".to_string(),
             challenge_id: "test".to_string(),
@@ -705,13 +689,13 @@ mod test {
             .to_string(),
         );
 
-        let res = create_userchallenge_routes(UserChallengeRepositoryForMemory::new())
+        create_userchallenge_routes(repository.clone())
             .oneshot(req)
             .await
             .unwrap();
 
-        let result = res_to_userchallenge(res).await;
+        let result = repository.read_stored_value();
 
-        assert_eq!(expected, result)
+        assert_eq!(expected, result[0])
     }
 }
