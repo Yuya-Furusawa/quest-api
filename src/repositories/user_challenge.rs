@@ -9,10 +9,8 @@ use std::{
 
 #[async_trait]
 pub trait UserChallengeRepository: Clone + Send + Sync + 'static {
-    async fn save_challenge_complete_event(
-        &self,
-        payload: CompleteChallengePayload,
-    ) -> anyhow::Result<CompleteChallenge>;
+    async fn save_challenge_complete_event(&self, payload: CompleteChallenge)
+        -> anyhow::Result<()>;
 }
 
 #[derive(Debug, Clone)]
@@ -30,9 +28,9 @@ impl UserChallengeRepositoryForDb {
 impl UserChallengeRepository for UserChallengeRepositoryForDb {
     async fn save_challenge_complete_event(
         &self,
-        payload: CompleteChallengePayload,
-    ) -> anyhow::Result<CompleteChallenge> {
-        let row = sqlx::query_as::<_, CompleteChallenge>(
+        payload: CompleteChallenge,
+    ) -> anyhow::Result<()> {
+        sqlx::query_as::<_, CompleteChallenge>(
             r#"
                 insert into user_completed_challenges (user_id, challenge_id) values ($1, $2)
                 returning *
@@ -43,7 +41,7 @@ impl UserChallengeRepository for UserChallengeRepositoryForDb {
         .fetch_one(&self.pool)
         .await?;
 
-        anyhow::Ok(row)
+        anyhow::Ok(())
     }
 }
 
@@ -65,22 +63,30 @@ impl UserChallengeRepositoryForMemory {
     fn write_store_ref(&self) -> RwLockWriteGuard<UserChallengeDatas> {
         self.store.write().unwrap()
     }
+
+    #[cfg(test)]
+    pub fn read_stored_value(&self) -> Vec<CompleteChallenge> {
+        let store = self.store.read().unwrap();
+        let challenges_vec = store
+            .values()
+            .map(|challenge| challenge.clone())
+            .collect::<Vec<CompleteChallenge>>();
+
+        challenges_vec
+    }
 }
 
 #[async_trait]
 impl UserChallengeRepository for UserChallengeRepositoryForMemory {
     async fn save_challenge_complete_event(
         &self,
-        payload: CompleteChallengePayload,
-    ) -> anyhow::Result<CompleteChallenge> {
+        payload: CompleteChallenge,
+    ) -> anyhow::Result<()> {
         let mut store = self.write_store_ref();
         let id = (store.len() + 1) as i32;
-        let complete_challenge = CompleteChallenge {
-            user_id: payload.user_id,
-            challenge_id: payload.challenge_id,
-        };
-        store.insert(id, complete_challenge.clone());
-        anyhow::Ok(complete_challenge)
+        store.insert(id, payload);
+
+        anyhow::Ok(())
     }
 }
 
@@ -88,10 +94,4 @@ impl UserChallengeRepository for UserChallengeRepositoryForMemory {
 pub struct CompleteChallenge {
     pub user_id: String,
     pub challenge_id: String,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct CompleteChallengePayload {
-    user_id: String,
-    challenge_id: String,
 }
