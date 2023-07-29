@@ -438,7 +438,6 @@ mod test {
             nanoid!(),
             "Test User".to_string(),
             "test@test.com".to_string(),
-            "password".to_string(),
         );
 
         let req = build_req_with_json(
