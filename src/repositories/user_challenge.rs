@@ -34,7 +34,7 @@ impl UserChallengeRepository for UserChallengeRepositoryForDb {
     ) -> anyhow::Result<CompleteChallenge> {
         let row = sqlx::query_as::<_, CompleteChallenge>(
             r#"
-                insert into user_challenges (user_id, challenge_id) values ($1, $2)
+                insert into user_completed_challenges (user_id, challenge_id) values ($1, $2)
                 returning *
             "#,
         )
@@ -76,7 +76,6 @@ impl UserChallengeRepository for UserChallengeRepositoryForMemory {
         let mut store = self.write_store_ref();
         let id = (store.len() + 1) as i32;
         let complete_challenge = CompleteChallenge {
-            id: id.clone(),
             user_id: payload.user_id,
             challenge_id: payload.challenge_id,
         };
@@ -87,7 +86,6 @@ impl UserChallengeRepository for UserChallengeRepositoryForMemory {
 
 #[derive(Debug, Clone, Deserialize, Serialize, FromRow, PartialEq)]
 pub struct CompleteChallenge {
-    pub id: i32,
     pub user_id: String,
     pub challenge_id: String,
 }

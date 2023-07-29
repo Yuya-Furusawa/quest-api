@@ -33,7 +33,7 @@ impl UserQuestRepository for UserQuestRepositoryForDb {
     ) -> anyhow::Result<ParticipateQuest> {
         let row = sqlx::query_as::<_, ParticipateQuest>(
             r#"
-				insert into user_quests (user_id, quest_id) values ($1, $2)
+				insert into user_participating_quests (user_id, quest_id) values ($1, $2)
 				returning *
 			"#,
         )
@@ -75,7 +75,6 @@ impl UserQuestRepository for UserQuestRepositoryForMemory {
         let mut store = self.write_store_ref();
         let id = (store.len() + 1) as i32;
         let participate_quest = ParticipateQuest {
-            id: id.clone(),
             user_id: payload.user_id,
             quest_id: payload.quest_id,
         };
@@ -86,7 +85,6 @@ impl UserQuestRepository for UserQuestRepositoryForMemory {
 
 #[derive(Debug, Clone, Deserialize, Serialize, FromRow, PartialEq)]
 pub struct ParticipateQuest {
-    pub id: i32,
     pub user_id: String,
     pub quest_id: String,
 }

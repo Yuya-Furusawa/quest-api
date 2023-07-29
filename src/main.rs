@@ -576,7 +576,6 @@ mod test {
     #[tokio::test]
     async fn should_participate_quest() {
         let expected = ParticipateQuest {
-            id: 1,
             user_id: "test".to_string(),
             quest_id: "test".to_string(),
         };
@@ -692,7 +691,6 @@ mod test {
     #[tokio::test]
     async fn should_complete_challenge() {
         let expected = CompleteChallenge {
-            id: 1,
             user_id: "test".to_string(),
             challenge_id: "test".to_string(),
         };
