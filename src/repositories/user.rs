@@ -267,6 +267,7 @@ impl UserRepository for UserRepositoryForMemory {
             username: user.username.clone(),
             email: user.email.clone(),
             participate_quest: vec![],
+            complete_challenge: vec![],
         })
     }
 
@@ -281,6 +282,7 @@ impl UserRepository for UserRepositoryForMemory {
             username: user.username.clone(),
             email: user.email.clone(),
             participate_quest: vec![],
+            complete_challenge: vec![]
         })
     }
 
@@ -292,6 +294,7 @@ impl UserRepository for UserRepositoryForMemory {
             username: user.username.clone(),
             email: user.email.clone(),
             participate_quest: vec![],
+            complete_challenge: vec![],
         })
     }
 
