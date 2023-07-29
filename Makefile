@@ -1,15 +1,19 @@
-include .env
+.PHONY: up migrate
 
 build:
-	docker-compose build
+	docker-compose -f docker-compose.yml -f docker-compose.dev.yml build
 
-db:
-	docker-compose up
+up:
+	docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
-dev:
-	docker-compose exec api bash -c "sqlx db create --database-url $(DATABASE_URL)"
-	docker-compose exec api bash -c "sqlx migrate run --ignore-missing"
-	docker-compose exec api cargo watch -x run
+migrate:
+	docker-compose exec api sqlx migrate run --ignore-missing
+
+start: up migrate
+
+# ボリュームも合わせて削除する
+down:
+	docker-compose -f docker-compose.yml -f docker-compose.dev.yml down -v
 
 test:
 	cargo test
