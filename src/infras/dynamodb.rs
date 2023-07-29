@@ -154,6 +154,21 @@ impl DynamoDB {
             .collect::<Vec<String>>();
         Ok(quest_ids)
     }
+
+    pub async fn delete_participating_quest_ids(
+        &self,
+        user_id: String,
+        quest_id: String,
+    ) -> anyhow::Result<()> {
+        self.client
+            .delete_item()
+            .table_name(Self::USER_PARTICIPATING_QUESTS_TABLE_NAME)
+            .key("UserId", AttributeValue::S(user_id))
+            .key("QuestId", AttributeValue::S(quest_id))
+            .send()
+            .await?;
+        Ok(())
+    }
 }
 
 /*
@@ -461,6 +476,21 @@ impl DynamoDB {
             .collect::<Vec<String>>();
         Ok(challenge_ids)
     }
+
+    pub async fn delete_completed_challenge_ids(
+        &self,
+        user_id: String,
+        challenge_id: String,
+    ) -> anyhow::Result<()> {
+        self.client
+            .delete_item()
+            .table_name(Self::USER_COMPLETED_CHALLENGES_TABLE_NAME)
+            .key("UserId", AttributeValue::S(user_id))
+            .key("ChallengeId", AttributeValue::S(challenge_id))
+            .send()
+            .await?;
+        Ok(())
+    }
 }
 
 /// 実行前にdocker composeでdynamodb-localを起動しておく必要がある
@@ -646,5 +676,47 @@ mod tests {
         db.delete_challenge(challenge2.id.clone(), challenge2.quest_id.clone())
             .await
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_participate_quest() {
+        let db = create_client().await;
+
+        let quest_id = "test-quest".to_string();
+        let user_id = "test-user".to_string();
+
+        db.put_user_participate_quest(user_id.clone(), quest_id.clone())
+            .await;
+
+        let queried_quest_ids = db
+            .query_user_participate_quest_ids(user_id.clone())
+            .await
+            .unwrap();
+        println!("{:?}", queried_quest_ids.clone());
+        assert_eq!(queried_quest_ids.len(), 1);
+        assert_eq!(queried_quest_ids[0], quest_id.clone());
+
+        db.delete_participating_quest_ids(user_id, quest_id).await;
+    }
+
+    #[tokio::test]
+    async fn test_complete_challenge() {
+        let db = create_client().await;
+
+        let challenge_id = "test-challenge".to_string();
+        let user_id = "test-user".to_string();
+
+        db.put_user_complete_challenge(user_id.clone(), challenge_id.clone())
+            .await;
+
+        let queried_challenge_ids = db
+            .query_user_complete_challenge_ids(user_id.clone())
+            .await
+            .unwrap();
+        assert_eq!(queried_challenge_ids.len(), 1);
+        assert_eq!(queried_challenge_ids[0], challenge_id.clone());
+
+        db.delete_completed_challenge_ids(user_id, challenge_id)
+            .await;
     }
 }
