@@ -81,10 +81,8 @@ fn create_app<
     secret_key: String,
 ) -> Router {
     let user_routes = create_user_routes(user_repository, secret_key);
-    let quest_routes = create_quest_routes(quest_repository);
-    let challenge_routes = create_challenge_routes(challenge_repository);
-    let userquest_routes = create_userquest_routes(userquest_repository);
-    let userchallenge_routes = create_userchallenge_routes(userchallenge_repository);
+    let quest_routes = create_quest_routes(quest_repository, userquest_repository);
+    let challenge_routes = create_challenge_routes(challenge_repository, userchallenge_repository);
 
     let origins = [
         "http://localhost:5173".parse::<HeaderValue>().unwrap(),
@@ -98,8 +96,6 @@ fn create_app<
         .nest("/", user_routes)
         .nest("/", quest_routes)
         .nest("/", challenge_routes)
-        .nest("/", userquest_routes)
-        .nest("/", userchallenge_routes)
         .layer(
             CorsLayer::new()
                 .allow_origin(origins)
@@ -129,7 +125,10 @@ fn create_user_routes<T: UserRepository>(user_repository: T, secret_key: String)
         .layer(Extension(user_state))
 }
 
-fn create_quest_routes<T: QuestRepository>(quest_repository: T) -> Router {
+fn create_quest_routes<T: QuestRepository, S: UserQuestRepository>(
+    quest_repository: T,
+    userquest_repository: S,
+) -> Router {
     Router::new()
         .route("/quests", post(create_quest::<T>).get(all_quests::<T>))
         .route(
@@ -138,28 +137,23 @@ fn create_quest_routes<T: QuestRepository>(quest_repository: T) -> Router {
                 .patch(update_quest::<T>)
                 .delete(delete_quest::<T>),
         )
+        .route("/quests/:id/participate", post(participate_quest::<S>))
         .layer(Extension(Arc::new(quest_repository)))
+        .layer(Extension(Arc::new(userquest_repository)))
 }
 
-fn create_challenge_routes<T: ChallengeRepository>(challenge_repository: T) -> Router {
+fn create_challenge_routes<T: ChallengeRepository, S: UserChallengeRepository>(
+    challenge_repository: T,
+    userchallenge_repository: S,
+) -> Router {
     Router::new()
         .route(
             "/challenges",
             post(create_challenge::<T>).get(find_challenge_by_quest_id::<T>),
         )
         .route("/challenges/:id", get(find_challenge::<T>))
+        .route("/challenges/:id/complete", post(complete_challenge::<S>))
         .layer(Extension(Arc::new(challenge_repository)))
-}
-
-fn create_userquest_routes<T: UserQuestRepository>(userquest_repository: T) -> Router {
-    Router::new()
-        .route("/participate", post(participate_quest::<T>))
-        .layer(Extension(Arc::new(userquest_repository)))
-}
-
-fn create_userchallenge_routes<T: UserChallengeRepository>(userchallenge_repository: T) -> Router {
-    Router::new()
-        .route("/complete", post(complete_challenge::<T>))
         .layer(Extension(Arc::new(userchallenge_repository)))
 }
 
@@ -285,10 +279,13 @@ mod test {
              }"#
             .to_string(),
         );
-        let res = create_quest_routes(QuestRepositoryForMemory::new())
-            .oneshot(req)
-            .await
-            .unwrap();
+        let res = create_quest_routes(
+            QuestRepositoryForMemory::new(),
+            UserQuestRepositoryForMemory::new(),
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
         let quest = res_to_quest(res).await;
 
         // idは異なる
@@ -322,7 +319,7 @@ mod test {
 
         let req_path = format!("{}{}", "/quests/", created_quest.id);
         let req = build_req_with_empty(&req_path, Method::GET);
-        let res = create_quest_routes(quest_repository)
+        let res = create_quest_routes(quest_repository, UserQuestRepositoryForMemory::new())
             .oneshot(req)
             .await
             .unwrap();
@@ -356,7 +353,7 @@ mod test {
             .expect("failed to create quest");
 
         let req = build_req_with_empty("/quests", Method::GET);
-        let res = create_quest_routes(quest_repository)
+        let res = create_quest_routes(quest_repository, UserQuestRepositoryForMemory::new())
             .oneshot(req)
             .await
             .unwrap();
@@ -401,7 +398,7 @@ mod test {
              }"#
             .to_string(),
         );
-        let res = create_quest_routes(quest_repository)
+        let res = create_quest_routes(quest_repository, UserQuestRepositoryForMemory::new())
             .oneshot(req)
             .await
             .unwrap();
@@ -427,7 +424,7 @@ mod test {
 
         let req_path = format!("{}{}", "/quests/", created_quest.id);
         let req = build_req_with_empty(&req_path, Method::DELETE);
-        let res = create_quest_routes(quest_repository)
+        let res = create_quest_routes(quest_repository, UserQuestRepositoryForMemory::new())
             .oneshot(req)
             .await
             .unwrap();
@@ -562,17 +559,18 @@ mod test {
             quest_id: "test".to_string(),
         };
 
+        let req_path = format!("/quests/{}/participate", "test");
+
         let req = build_req_with_json(
-            "/participate",
+            &req_path,
             Method::POST,
             r#"{
-                "user_id": "test",
-                "quest_id": "test"
+                "user_id": "test"
             }"#
             .to_string(),
         );
 
-        create_userquest_routes(repository.clone())
+        create_quest_routes(QuestRepositoryForMemory::new(), repository.clone())
             .oneshot(req)
             .await
             .unwrap();
@@ -606,10 +604,13 @@ mod test {
             .to_string(),
         );
 
-        let res = create_challenge_routes(ChallengeRepositoryForMemory::new())
-            .oneshot(req)
-            .await
-            .unwrap();
+        let res = create_challenge_routes(
+            ChallengeRepositoryForMemory::new(),
+            UserChallengeRepositoryForMemory::new(),
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
 
         let result = res_to_challenge(res).await;
 
@@ -632,10 +633,13 @@ mod test {
 
         let req_path = format!("{}{}", "/challenges/", created_challenge.id);
         let req = build_req_with_empty(&req_path, Method::GET);
-        let res = create_challenge_routes(challenge_repository)
-            .oneshot(req)
-            .await
-            .expect("failed to find challenge");
+        let res = create_challenge_routes(
+            challenge_repository,
+            UserChallengeRepositoryForMemory::new(),
+        )
+        .oneshot(req)
+        .await
+        .expect("failed to find challenge");
         let challenge = res_to_challenge(res).await;
 
         assert_eq!(created_challenge, challenge)
@@ -657,10 +661,13 @@ mod test {
 
         let req_path = format!("{}?quest_id={}", "/challenges", created_challenge.quest_id);
         let req = build_req_with_empty(&req_path, Method::GET);
-        let res = create_challenge_routes(challenge_repository)
-            .oneshot(req)
-            .await
-            .expect("failed to find challenge");
+        let res = create_challenge_routes(
+            challenge_repository,
+            UserChallengeRepositoryForMemory::new(),
+        )
+        .oneshot(req)
+        .await
+        .expect("failed to find challenge");
 
         let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
         let body: String = String::from_utf8(bytes.to_vec()).unwrap();
@@ -679,17 +686,18 @@ mod test {
             challenge_id: "test".to_string(),
         };
 
+        let path = format!("/challenges/{}/complete", "test");
+
         let req = build_req_with_json(
-            "/complete",
+            &path,
             Method::POST,
             r#"{
-                "user_id": "test",
-                "challenge_id": "test"
+                "user_id": "test"
             }"#
             .to_string(),
         );
 
-        create_userchallenge_routes(repository.clone())
+        create_challenge_routes(ChallengeRepositoryForMemory::new(), repository.clone())
             .oneshot(req)
             .await
             .unwrap();

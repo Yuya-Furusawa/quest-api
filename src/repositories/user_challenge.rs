@@ -9,8 +9,11 @@ use std::{
 
 #[async_trait]
 pub trait UserChallengeRepository: Clone + Send + Sync + 'static {
-    async fn save_challenge_complete_event(&self, payload: CompleteChallenge)
-        -> anyhow::Result<()>;
+    async fn save_challenge_complete_event(
+        &self,
+        user_id: String,
+        challenge_id: String,
+    ) -> anyhow::Result<()>;
 }
 
 #[derive(Debug, Clone)]
@@ -28,7 +31,8 @@ impl UserChallengeRepositoryForDb {
 impl UserChallengeRepository for UserChallengeRepositoryForDb {
     async fn save_challenge_complete_event(
         &self,
-        payload: CompleteChallenge,
+        user_id: String,
+        challenge_id: String,
     ) -> anyhow::Result<()> {
         sqlx::query_as::<_, CompleteChallenge>(
             r#"
@@ -36,8 +40,8 @@ impl UserChallengeRepository for UserChallengeRepositoryForDb {
                 returning *
             "#,
         )
-        .bind(payload.user_id)
-        .bind(payload.challenge_id)
+        .bind(user_id)
+        .bind(challenge_id)
         .fetch_one(&self.pool)
         .await?;
 
@@ -80,11 +84,18 @@ impl UserChallengeRepositoryForMemory {
 impl UserChallengeRepository for UserChallengeRepositoryForMemory {
     async fn save_challenge_complete_event(
         &self,
-        payload: CompleteChallenge,
+        user_id: String,
+        challenge_id: String,
     ) -> anyhow::Result<()> {
         let mut store = self.write_store_ref();
-        let id = (store.len() + 1) as i32;
-        store.insert(id, payload);
+        let id = store.len() as i32;
+        store.insert(
+            id,
+            CompleteChallenge {
+                user_id,
+                challenge_id,
+            },
+        );
 
         anyhow::Ok(())
     }
@@ -94,4 +105,9 @@ impl UserChallengeRepository for UserChallengeRepositoryForMemory {
 pub struct CompleteChallenge {
     pub user_id: String,
     pub challenge_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CompleteChallengePayload {
+    pub user_id: String,
 }

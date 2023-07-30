@@ -1,14 +1,20 @@
-use axum::{extract::Extension, http::StatusCode, response::IntoResponse, Json};
+use axum::{
+    extract::{Extension, Path},
+    http::StatusCode,
+    response::IntoResponse,
+    Json,
+};
 use std::sync::Arc;
 
-use crate::repositories::user_quest::{ParticipateQuest, UserQuestRepository};
+use crate::repositories::user_quest::{ParticipateQuestPayload, UserQuestRepository};
 
 pub async fn participate_quest<T: UserQuestRepository>(
-    Json(payload): Json<ParticipateQuest>,
+    Path(id): Path<String>,
+    Json(payload): Json<ParticipateQuestPayload>,
     Extension(repository): Extension<Arc<T>>,
 ) -> Result<impl IntoResponse, StatusCode> {
     repository
-        .save_quest_participate_event(payload)
+        .save_quest_participate_event(payload.user_id, id)
         .await
         .or(Err(StatusCode::BAD_REQUEST))?;
 
