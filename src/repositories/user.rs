@@ -73,8 +73,8 @@ impl UserRepository for UserRepositoryForDb {
 
         let user_quest = sqlx::query_as::<_, UserWithQuestFromRow>(
             r#"
-                select user_quests.*, quests.title as title, quests.description as description, quests.price as price, quests.difficulty as difficulty, quests.num_participate as num_participate, quests.num_clear as num_clear from user_quests
-                    left outer join quests on user_quests.quest_id = quests.id
+                select user_participating_quests.*, quests.title as title, quests.description as description, quests.price as price, quests.difficulty as difficulty, quests.num_participate as num_participate, quests.num_clear as num_clear from user_participating_quests
+                    left outer join quests on user_participating_quests.quest_id = quests.id
                     where user_id=$1;
             "#
         )
@@ -99,7 +99,7 @@ impl UserRepository for UserRepositoryForDb {
 
         let user_challenge = sqlx::query_as::<_, UserChallengeFromRow>(
             r#"
-                select * from user_challenges where user_id=$1
+                select * from user_completed_challenges where user_id=$1
             "#,
         )
         .bind(user_row.id.clone())
@@ -136,8 +136,8 @@ impl UserRepository for UserRepositoryForDb {
 
         let user_quest = sqlx::query_as::<_, UserWithQuestFromRow>(
             r#"
-                select user_quests.*, quests.title as title, quests.description as description, quests.price as price, quests.difficulty as difficulty, quests.num_participate as num_participate, quests.num_clear as num_clear from user_quests
-                    left outer join quests on user_quests.quest_id = quests.id
+                select user_participating_quests.*, quests.title as title, quests.description as description, quests.price as price, quests.difficulty as difficulty, quests.num_participate as num_participate, quests.num_clear as num_clear from user_participating_quests
+                    left outer join quests on user_participating_quests.quest_id = quests.id
                     where user_id=$1;
             "#
         )
@@ -162,7 +162,7 @@ impl UserRepository for UserRepositoryForDb {
 
         let user_challenge = sqlx::query_as::<_, UserChallengeFromRow>(
             r#"
-                select * from user_challenges where user_id=$1
+                select * from user_completed_challenges where user_id=$1
             "#,
         )
         .bind(id.clone())
@@ -193,7 +193,7 @@ impl UserRepository for UserRepositoryForDb {
         // user_challengesの削除
         sqlx::query(
             r#"
-                delete from user_challenges where use_id=$1
+                delete from user_completed_challenges where use_id=$1
             "#,
         )
         .bind(id.clone())
@@ -203,7 +203,7 @@ impl UserRepository for UserRepositoryForDb {
         // user_questsの削除
         sqlx::query(
             r#"
-                delete from user_quests where use_id=$1
+                delete from user_participating_quests where use_id=$1
             "#,
         )
         .bind(id.clone())
@@ -316,7 +316,6 @@ struct UserFromRow {
 #[allow(dead_code)]
 #[derive(Debug, Clone, FromRow)]
 struct UserWithQuestFromRow {
-    id: i32,
     user_id: String,
     quest_id: String,
     title: String,
@@ -331,7 +330,6 @@ struct UserWithQuestFromRow {
 #[allow(dead_code)]
 #[derive(Debug, Clone, FromRow)]
 struct UserChallengeFromRow {
-    id: i32,
     user_id: String,
     challenge_id: String,
 }
