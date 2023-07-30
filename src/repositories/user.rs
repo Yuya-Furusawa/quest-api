@@ -282,7 +282,7 @@ impl UserRepository for UserRepositoryForMemory {
             username: user.username.clone(),
             email: user.email.clone(),
             participate_quest: vec![],
-            complete_challenge: vec![]
+            complete_challenge: vec![],
         })
     }
 
@@ -361,8 +361,7 @@ impl UserEntity {
 // idと参加クエストが違っても同じユーザー
 impl PartialEq for UserEntity {
     fn eq(&self, other: &UserEntity) -> bool {
-        (self.username == other.username)
-            && (self.email == other.email)
+        (self.username == other.username) && (self.email == other.email)
     }
 }
 
