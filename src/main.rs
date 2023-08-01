@@ -178,10 +178,12 @@ mod test {
     use crate::repositories::{
         challenge::{Challenge, ChallengeRepositoryForMemory, CreateChallenge},
         quest::{CreateQuest, Difficulty, QuestEntity, QuestRepositoryForMemory},
-        user::{RegisterUser, UserEntity, UserRepositoryForMemory},
+        user::{RegisterUser, UserEntity},
         user_challenge::{CompleteChallenge, UserChallengeRepositoryForMemory},
         user_quest::{ParticipateQuest, UserQuestRepositoryForMemory},
     };
+
+    const DB_URL_FOR_TEST: &str = "postgres://admin:admin@localhost:5432/quests";
 
     fn build_req_with_empty(path: &str, method: Method) -> Request<Body> {
         Request::builder()
@@ -434,7 +436,9 @@ mod test {
 
     #[tokio::test]
     async fn should_register_user() {
-        let user_repository = UserRepositoryForMemory::new();
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
+            .await
+            .unwrap();
         let expected = UserEntity::new(
             nanoid!(),
             "Test User".to_string(),
@@ -467,7 +471,9 @@ mod test {
 
     #[tokio::test]
     async fn should_login_user() {
-        let user_repository = UserRepositoryForMemory::new();
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
+            .await
+            .unwrap();
         let created_user = user_repository
             .register(RegisterUser::new(
                 "Test User".to_string(),
@@ -501,7 +507,9 @@ mod test {
 
     #[tokio::test]
     async fn should_find_user() {
-        let user_repository = UserRepositoryForMemory::new();
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
+            .await
+            .unwrap();
         let created_user = user_repository
             .register(RegisterUser::new(
                 "Test User".to_string(),
@@ -527,7 +535,9 @@ mod test {
 
     #[tokio::test]
     async fn should_delete_user() {
-        let user_repository = UserRepositoryForMemory::new();
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
+            .await
+            .unwrap();
         let creared_user = user_repository
             .register(RegisterUser::new(
                 "Test User".to_string(),
@@ -547,7 +557,9 @@ mod test {
             .await
             .unwrap();
 
-        assert_eq!(StatusCode::NO_CONTENT, res.status());
+        let status = res.status();
+
+        assert_eq!(StatusCode::NO_CONTENT, status);
     }
 
     #[tokio::test]

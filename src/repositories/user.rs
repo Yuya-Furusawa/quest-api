@@ -1,14 +1,9 @@
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use axum::async_trait;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use nanoid::nanoid;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
-use std::{
-    collections::HashMap,
-    io::ErrorKind::NotFound,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
-};
 
 use crate::repositories::{
     challenge::Challenge,
@@ -229,85 +224,6 @@ impl UserRepository for UserRepositoryForDb {
 
         tx.commit().await?;
 
-        anyhow::Ok(())
-    }
-}
-
-type UserDatas = HashMap<String, UserFromRow>;
-
-#[derive(Debug, Clone)]
-pub struct UserRepositoryForMemory {
-    store: Arc<RwLock<UserDatas>>,
-}
-
-impl UserRepositoryForMemory {
-    #[cfg(test)]
-    pub fn new() -> Self {
-        Self {
-            store: Arc::default(),
-        }
-    }
-
-    fn write_store_ref(&self) -> RwLockWriteGuard<UserDatas> {
-        self.store.write().unwrap()
-    }
-
-    fn read_store_ref(&self) -> RwLockReadGuard<UserDatas> {
-        self.store.read().unwrap()
-    }
-}
-
-#[async_trait]
-impl UserRepository for UserRepositoryForMemory {
-    async fn register(&self, payload: RegisterUser) -> anyhow::Result<UserEntity> {
-        let mut store = self.write_store_ref();
-        let id = nanoid!();
-        let user = UserFromRow {
-            id: id.clone(),
-            username: payload.username,
-            email: payload.email,
-            password: payload.password,
-        };
-        store.insert(id, user.clone());
-        Ok(UserEntity {
-            id: user.id.clone(),
-            username: user.username.clone(),
-            email: user.email.clone(),
-            participate_quest: vec![],
-            complete_challenge: vec![],
-        })
-    }
-
-    async fn login(&self, payload: LoginUser) -> anyhow::Result<UserEntity> {
-        let store = self.read_store_ref();
-        let user = store
-            .values()
-            .find(|user| (**user).email == payload.email && (**user).password == payload.password)
-            .ok_or_else(|| anyhow::Error::msg("not found"))?;
-        Ok(UserEntity {
-            id: user.id.clone(),
-            username: user.username.clone(),
-            email: user.email.clone(),
-            participate_quest: vec![],
-            complete_challenge: vec![],
-        })
-    }
-
-    async fn find(&self, id: String) -> anyhow::Result<UserEntity> {
-        let store = self.read_store_ref();
-        let user = store.get(&id).map(|user| user.clone()).unwrap();
-        Ok(UserEntity {
-            id: user.id.clone(),
-            username: user.username.clone(),
-            email: user.email.clone(),
-            participate_quest: vec![],
-            complete_challenge: vec![],
-        })
-    }
-
-    async fn delete(&self, id: String) -> anyhow::Result<()> {
-        let mut store = self.write_store_ref();
-        store.remove(&id).context(NotFound)?;
         anyhow::Ok(())
     }
 }
