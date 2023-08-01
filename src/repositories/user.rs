@@ -200,7 +200,7 @@ impl UserRepository for UserRepositoryForDb {
         // user_challengesの削除
         sqlx::query(
             r#"
-                delete from user_completed_challenges where use_id=$1
+                delete from user_completed_challenges where user_id=$1
             "#,
         )
         .bind(id.clone())
@@ -210,7 +210,7 @@ impl UserRepository for UserRepositoryForDb {
         // user_questsの削除
         sqlx::query(
             r#"
-                delete from user_participating_quests where use_id=$1
+                delete from user_participating_quests where user_id=$1
             "#,
         )
         .bind(id.clone())
