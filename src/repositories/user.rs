@@ -32,6 +32,13 @@ impl UserRepositoryForDb {
     pub fn new(pool: PgPool) -> Self {
         UserRepositoryForDb { pool }
     }
+
+    #[cfg(test)]
+    /// テスト用の簡易版コンストラクタ
+    pub async fn with_url(url: &str) -> anyhow::Result<Self> {
+        let pool = PgPool::connect(url).await?;
+        Ok(UserRepositoryForDb::new(pool))
+    }
 }
 
 #[async_trait]
