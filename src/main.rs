@@ -179,7 +179,7 @@ mod test {
         challenge::{Challenge, CreateChallenge},
         quest::{CreateQuest, Difficulty, QuestEntity},
         user::{RegisterUser, UserEntity},
-        user_challenge::{CompleteChallenge, UserChallengeRepositoryForMemory},
+        user_challenge::CompleteChallenge,
         user_quest::{ParticipateQuest, UserQuestRepositoryForMemory},
     };
 
@@ -621,7 +621,7 @@ mod test {
 
         let res = create_challenge_routes(
             ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
-            UserChallengeRepositoryForMemory::new(),
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
         )
         .oneshot(req)
         .await
@@ -650,7 +650,7 @@ mod test {
         let req = build_req_with_empty(&req_path, Method::GET);
         let res = create_challenge_routes(
             challenge_repository,
-            UserChallengeRepositoryForMemory::new(),
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
         )
         .oneshot(req)
         .await
@@ -678,7 +678,7 @@ mod test {
         let req = build_req_with_empty(&req_path, Method::GET);
         let res = create_challenge_routes(
             challenge_repository,
-            UserChallengeRepositoryForMemory::new(),
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
         )
         .oneshot(req)
         .await
@@ -694,20 +694,15 @@ mod test {
 
     #[tokio::test]
     async fn should_complete_challenge() {
-        let repository = UserChallengeRepositoryForMemory::new();
+        let repository = UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
 
-        let expected = CompleteChallenge {
-            user_id: "test".to_string(),
-            challenge_id: "test".to_string(),
-        };
-
-        let path = format!("/challenges/{}/complete", "test");
+        let path = format!("/challenges/test_challenge/complete");
 
         let req = build_req_with_json(
             &path,
             Method::POST,
             r#"{
-                "user_id": "test"
+                "user_id": "test_user"
             }"#
             .to_string(),
         );
@@ -720,8 +715,11 @@ mod test {
         .await
         .unwrap();
 
-        let result = repository.read_stored_value();
+        let result = repository
+            .query_user_completed_challenges("test_user".to_string())
+            .await
+            .unwrap();
 
-        assert_eq!(expected, result[0])
+        assert_eq!(result, vec!["test_challenge".to_string()])
     }
 }
