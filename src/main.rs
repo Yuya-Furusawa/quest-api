@@ -664,7 +664,7 @@ mod test {
             .create(CreateChallenge::new(
                 "Test Challenge".to_string(),
                 "This is a test challenge".to_string(),
-                "test_id".to_string(),
+                nanoid::nanoid!(),
                 35.6895,
                 139.6917,
             ))
