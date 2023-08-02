@@ -176,7 +176,7 @@ mod test {
     use tower::ServiceExt;
 
     use crate::repositories::{
-        challenge::{Challenge, ChallengeRepositoryForMemory, CreateChallenge},
+        challenge::{Challenge, CreateChallenge},
         quest::{CreateQuest, Difficulty, QuestEntity, QuestRepositoryForMemory},
         user::{RegisterUser, UserEntity},
         user_challenge::{CompleteChallenge, UserChallengeRepositoryForMemory},
@@ -617,7 +617,7 @@ mod test {
         );
 
         let res = create_challenge_routes(
-            ChallengeRepositoryForMemory::new(),
+            ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
             UserChallengeRepositoryForMemory::new(),
         )
         .oneshot(req)
@@ -631,7 +631,7 @@ mod test {
 
     #[tokio::test]
     async fn should_find_challenge() {
-        let challenge_repository = ChallengeRepositoryForMemory::new();
+        let challenge_repository = ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
         let created_challenge = challenge_repository
             .create(CreateChallenge::new(
                 "Test Challenge".to_string(),
@@ -659,7 +659,7 @@ mod test {
 
     #[tokio::test]
     async fn should_find_challnege_by_quest_id() {
-        let challenge_repository = ChallengeRepositoryForMemory::new();
+        let challenge_repository = ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
         let created_challenge = challenge_repository
             .create(CreateChallenge::new(
                 "Test Challenge".to_string(),
@@ -709,10 +709,13 @@ mod test {
             .to_string(),
         );
 
-        create_challenge_routes(ChallengeRepositoryForMemory::new(), repository.clone())
-            .oneshot(req)
-            .await
-            .unwrap();
+        create_challenge_routes(
+            ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            repository.clone(),
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
 
         let result = repository.read_stored_value();
 

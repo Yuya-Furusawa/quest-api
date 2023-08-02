@@ -3,10 +3,6 @@ use axum::async_trait;
 use nanoid::nanoid;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
-};
 
 #[async_trait]
 pub trait ChallengeRepository: Clone + std::marker::Send + std::marker::Sync + 'static {
@@ -23,6 +19,13 @@ pub struct ChallengeRepositoryForDb {
 impl ChallengeRepositoryForDb {
     pub fn new(pool: PgPool) -> Self {
         ChallengeRepositoryForDb { pool }
+    }
+
+    #[cfg(test)]
+    /// テスト用の簡易版コンストラクタ
+    pub async fn with_url(url: &str) -> Self {
+        let pool = PgPool::connect(url).await.unwrap();
+        ChallengeRepositoryForDb::new(pool)
     }
 }
 
@@ -70,64 +73,6 @@ impl ChallengeRepository for ChallengeRepositoryForDb {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(challenges)
-    }
-}
-
-type ChallengeDatas = HashMap<String, Challenge>;
-
-#[derive(Debug, Clone)]
-pub struct ChallengeRepositoryForMemory {
-    store: Arc<RwLock<ChallengeDatas>>,
-}
-
-impl ChallengeRepositoryForMemory {
-    #[cfg(test)]
-    pub fn new() -> Self {
-        Self {
-            store: Arc::default(),
-        }
-    }
-
-    fn write_store_ref(&self) -> RwLockWriteGuard<ChallengeDatas> {
-        self.store.write().unwrap()
-    }
-
-    fn read_store_ref(&self) -> RwLockReadGuard<ChallengeDatas> {
-        self.store.read().unwrap()
-    }
-}
-
-#[async_trait]
-impl ChallengeRepository for ChallengeRepositoryForMemory {
-    async fn create(&self, payload: CreateChallenge) -> anyhow::Result<Challenge> {
-        let mut store = self.write_store_ref();
-        let id = nanoid!();
-        let challenge = Challenge::new(
-            id.clone(),
-            payload.name,
-            payload.description,
-            payload.quest_id,
-            payload.latitude,
-            payload.longitude,
-        );
-        store.insert(id, challenge.clone());
-        Ok(challenge)
-    }
-
-    async fn find(&self, id: String) -> anyhow::Result<Challenge> {
-        let store = self.read_store_ref();
-        let challenge = store.get(&id).map(|challenge| challenge.clone()).unwrap();
-        Ok(challenge)
-    }
-
-    async fn find_by_quest_id(&self, quest_id: String) -> anyhow::Result<Vec<Challenge>> {
-        let store = self.read_store_ref();
-        let challenges = store
-            .values()
-            .filter(|challenge| challenge.quest_id == quest_id)
-            .map(|challenge| challenge.clone())
-            .collect::<Vec<Challenge>>();
         Ok(challenges)
     }
 }
