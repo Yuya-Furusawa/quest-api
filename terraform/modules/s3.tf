@@ -1,26 +1,18 @@
-resource "aws_s3_bucket" "challenge_images" {
-  bucket = "challenge-images-bucket"
+resource "aws_s3_bucket" "images" {
+  bucket = "quest-app-images-bucket"
+}
 
-  tags = {
-    Name = "Challenge Images"
+resource "aws_s3_bucket_ownership_controls" "images_ownership_controls" {
+  bucket = aws_s3_bucket.images.id
+
+  rule {
+    object_ownership = "BucketOwnerPreferred"
   }
 }
 
-resource "aws_s3_bucket_policy" "challenge_images_bucket_policy" {
-  bucket = aws_s3_bucket.challenge_images.id
-  policy = data.aws_iam_policy_document.allow_access.json
-}
+resource "aws_s3_bucket_acl" "example" {
+  depends_on = [ aws_s3_bucket_ownership_controls.images_ownership_controls ]
 
-data "aws_iam_policy_document" "allow_access" {
-  statement {
-    sid       = "AddPerm"
-    effect    = "Allow"
-    actions   = ["s3:GetObject"]
-    resources = ["${aws_s3_bucket.challenge_images.arn}/*"]
-
-    principals {
-      type        = "*"
-      identifiers = ["*"]
-    }
-  }
+  bucket = aws_s3_bucket.images.id
+  acl    = "private"
 }
