@@ -355,15 +355,23 @@ mod test {
             .expect("failed to create quest");
 
         let req = build_req_with_empty("/quests", Method::GET);
-        let res = create_quest_routes(quest_repository, UserQuestRepositoryForMemory::new())
-            .oneshot(req)
-            .await
-            .unwrap();
+        let res = create_quest_routes(
+            quest_repository.clone(),
+            UserQuestRepositoryForMemory::new(),
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
         let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
         let body: String = String::from_utf8(bytes.to_vec()).unwrap();
         let quests: Vec<QuestEntity> = serde_json::from_str(&body)
             .expect(&format!("cannot convert Quest instance. body {}", body));
-        assert_eq!(vec![expected], quests);
+        assert_eq!(vec![expected.clone()], quests);
+
+        quest_repository
+            .delete(expected.id)
+            .await
+            .expect("failed to delete quest");
     }
 
     #[tokio::test]
