@@ -179,8 +179,6 @@ mod test {
         challenge::{Challenge, CreateChallenge},
         quest::{CreateQuest, Difficulty, QuestEntity},
         user::{RegisterUser, UserEntity},
-        user_challenge::CompleteChallenge,
-        user_quest::{ParticipateQuest, UserQuestRepositoryForMemory},
     };
 
     const DB_URL_FOR_TEST: &str = "postgres://admin:admin@localhost:5432/quests";
@@ -283,7 +281,7 @@ mod test {
         );
         let res = create_quest_routes(
             QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
-            UserQuestRepositoryForMemory::new(),
+            UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
         )
         .oneshot(req)
         .await
@@ -321,10 +319,13 @@ mod test {
 
         let req_path = format!("{}{}", "/quests/", created_quest.id);
         let req = build_req_with_empty(&req_path, Method::GET);
-        let res = create_quest_routes(quest_repository, UserQuestRepositoryForMemory::new())
-            .oneshot(req)
-            .await
-            .unwrap();
+        let res = create_quest_routes(
+            quest_repository,
+            UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
         let quest = res_to_quest(res).await;
 
         assert_eq!(expected, quest);
@@ -357,7 +358,7 @@ mod test {
         let req = build_req_with_empty("/quests", Method::GET);
         let res = create_quest_routes(
             quest_repository.clone(),
-            UserQuestRepositoryForMemory::new(),
+            UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
         )
         .oneshot(req)
         .await
@@ -408,10 +409,13 @@ mod test {
              }"#
             .to_string(),
         );
-        let res = create_quest_routes(quest_repository, UserQuestRepositoryForMemory::new())
-            .oneshot(req)
-            .await
-            .unwrap();
+        let res = create_quest_routes(
+            quest_repository,
+            UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
         let quest = res_to_quest(res).await;
 
         assert_eq!(expected, quest);
@@ -434,10 +438,13 @@ mod test {
 
         let req_path = format!("{}{}", "/quests/", created_quest.id);
         let req = build_req_with_empty(&req_path, Method::DELETE);
-        let res = create_quest_routes(quest_repository, UserQuestRepositoryForMemory::new())
-            .oneshot(req)
-            .await
-            .unwrap();
+        let res = create_quest_routes(
+            quest_repository,
+            UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
 
         assert_eq!(StatusCode::NO_CONTENT, res.status());
     }
@@ -572,20 +579,15 @@ mod test {
 
     #[tokio::test]
     async fn should_participate_quest() {
-        let repository = UserQuestRepositoryForMemory::new();
+        let repository = UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
 
-        let expected = ParticipateQuest {
-            user_id: "test".to_string(),
-            quest_id: "test".to_string(),
-        };
-
-        let req_path = format!("/quests/{}/participate", "test");
+        let req_path = format!("/quests/test_quest/participate");
 
         let req = build_req_with_json(
             &req_path,
             Method::POST,
             r#"{
-                "user_id": "test"
+                "user_id": "test_user"
             }"#
             .to_string(),
         );
@@ -598,9 +600,12 @@ mod test {
         .await
         .unwrap();
 
-        let result = repository.read_stored_value();
+        let result = repository
+            .query_user_participating_quests("test_user".to_string())
+            .await
+            .unwrap();
 
-        assert_eq!(expected, result[0])
+        assert_eq!(vec!["test_quest".to_string()], result);
     }
 
     #[tokio::test]
@@ -702,20 +707,41 @@ mod test {
 
     #[tokio::test]
     async fn should_complete_challenge() {
+        // 事前準備
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let test_user = user_repository
+            .unwrap()
+            .register(RegisterUser::new(
+                "test_user".to_string(),
+                "test_email".to_string(),
+                "test_password".to_string(),
+            ))
+            .await
+            .unwrap();
+        let challenge_repository = ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let test_challenge = challenge_repository
+            .create(CreateChallenge::new(
+                "Test Challenge".to_string(),
+                "This is a test challenge".to_string(),
+                "test_id".to_string(),
+                35.6895,
+                139.6917,
+            ))
+            .await
+            .unwrap();
+
+        // テスト対象
         let repository = UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
 
-        let path = format!("/challenges/test_challenge/complete");
+        let path = format!("/challenges/{}/complete", test_challenge.id);
 
         let req = build_req_with_json(
             &path,
             Method::POST,
-            r#"{
-                "user_id": "test_user"
-            }"#
-            .to_string(),
+            format!("{{\"user_id\": \"{}\" }}", test_user.id).to_string(),
         );
 
-        create_challenge_routes(
+        let res = create_challenge_routes(
             ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
             repository.clone(),
         )
@@ -724,10 +750,10 @@ mod test {
         .unwrap();
 
         let result = repository
-            .query_user_completed_challenges("test_user".to_string())
+            .query_user_completed_challenges(test_user.id)
             .await
             .unwrap();
 
-        assert_eq!(result, vec!["test_challenge".to_string()])
+        assert_eq!(result, vec![test_challenge.id])
     }
 }
