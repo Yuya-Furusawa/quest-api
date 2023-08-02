@@ -368,11 +368,6 @@ mod test {
         let quests: Vec<QuestEntity> = serde_json::from_str(&body)
             .expect(&format!("cannot convert Quest instance. body {}", body));
         assert_eq!(vec![expected.clone()], quests);
-
-        quest_repository
-            .delete(expected.id)
-            .await
-            .expect("failed to delete quest");
     }
 
     #[tokio::test]
@@ -741,7 +736,7 @@ mod test {
             format!("{{\"user_id\": \"{}\" }}", test_user.id).to_string(),
         );
 
-        let res = create_challenge_routes(
+        create_challenge_routes(
             ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
             repository.clone(),
         )
