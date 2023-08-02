@@ -177,7 +177,7 @@ mod test {
 
     use crate::repositories::{
         challenge::{Challenge, CreateChallenge},
-        quest::{CreateQuest, Difficulty, QuestEntity, QuestRepositoryForMemory},
+        quest::{CreateQuest, Difficulty, QuestEntity},
         user::{RegisterUser, UserEntity},
         user_challenge::{CompleteChallenge, UserChallengeRepositoryForMemory},
         user_quest::{ParticipateQuest, UserQuestRepositoryForMemory},
@@ -282,7 +282,7 @@ mod test {
             .to_string(),
         );
         let res = create_quest_routes(
-            QuestRepositoryForMemory::new(),
+            QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
             UserQuestRepositoryForMemory::new(),
         )
         .oneshot(req)
@@ -296,7 +296,7 @@ mod test {
 
     #[tokio::test]
     async fn should_find_quest() {
-        let quest_repository = QuestRepositoryForMemory::new();
+        let quest_repository = QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
         let expected = QuestEntity::new(
             nanoid!(),
             "Test Find Quest".to_string(),
@@ -332,7 +332,7 @@ mod test {
 
     #[tokio::test]
     async fn should_all_quests() {
-        let quest_repository = QuestRepositoryForMemory::new();
+        let quest_repository = QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
         let expected = QuestEntity::new(
             nanoid!(),
             "Test All Quests".to_string(),
@@ -368,7 +368,7 @@ mod test {
 
     #[tokio::test]
     async fn should_update_quest() {
-        let quest_repository = QuestRepositoryForMemory::new();
+        let quest_repository = QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
         let expected = QuestEntity::new(
             nanoid!(),
             "Test Update Quests".to_string(),
@@ -411,7 +411,7 @@ mod test {
 
     #[tokio::test]
     async fn should_delete_quest() {
-        let quest_repository = QuestRepositoryForMemory::new();
+        let quest_repository = QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
         let created_quest = quest_repository
             .create(CreateQuest::new(
                 "Test Delete Quests".to_string(),
@@ -582,10 +582,13 @@ mod test {
             .to_string(),
         );
 
-        create_quest_routes(QuestRepositoryForMemory::new(), repository.clone())
-            .oneshot(req)
-            .await
-            .unwrap();
+        create_quest_routes(
+            QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            repository.clone(),
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
 
         let result = repository.read_stored_value();
 
