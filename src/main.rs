@@ -574,17 +574,39 @@ mod test {
 
     #[tokio::test]
     async fn should_participate_quest() {
+        // 事前準備
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let test_user = user_repository
+            .unwrap()
+            .register(RegisterUser::new(
+                "test_user".to_string(),
+                "test_email".to_string(),
+                "test_password".to_string(),
+            ))
+            .await
+            .unwrap();
+        let quest_repository = QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let test_quest = quest_repository
+            .create(CreateQuest::new(
+                "Test Quest".to_string(),
+                "This is a test quest.".to_string(),
+                0,
+                Difficulty::Normal,
+                12345,
+                123,
+            ))
+            .await
+            .unwrap();
+
+        // テスト対象
         let repository = UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
 
-        let req_path = format!("/quests/test_quest/participate");
+        let req_path = format!("/quests/{}/participate", test_quest.id);
 
         let req = build_req_with_json(
             &req_path,
             Method::POST,
-            r#"{
-                "user_id": "test_user"
-            }"#
-            .to_string(),
+            format!("{{\"user_id\": \"{}\" }}", test_user.id).to_string(),
         );
 
         create_quest_routes(
@@ -596,11 +618,11 @@ mod test {
         .unwrap();
 
         let result = repository
-            .query_user_participating_quests("test_user".to_string())
+            .query_user_participating_quests(test_user.id)
             .await
             .unwrap();
 
-        assert_eq!(vec!["test_quest".to_string()], result);
+        assert_eq!(vec![test_quest.id], result);
     }
 
     #[tokio::test]
