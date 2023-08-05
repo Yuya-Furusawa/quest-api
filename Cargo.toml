@@ -14,7 +14,6 @@ db-tests = []
 anyhow = "1.0.66"
 aws-config = "0.55.3"
 aws-sdk-dynamodb = { version = "0.28.0", features = ["test-util"] }
-aws-sdk-s3 = "0.28.0"
 axum = { version = "0.5.17", features = ["headers"] }
 bcrypt = "0.14"
 chrono = "0.4.26"
