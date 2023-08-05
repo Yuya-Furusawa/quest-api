@@ -1,13 +1,8 @@
-use anyhow::{Context, Ok};
+use anyhow::Ok;
 use axum::async_trait;
 use nanoid::nanoid;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool, Type};
-use std::{
-    collections::HashMap,
-    io::ErrorKind::NotFound,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
-};
 
 use super::challenge::Challenge;
 
@@ -28,6 +23,13 @@ pub struct QuestRepositoryForDb {
 impl QuestRepositoryForDb {
     pub fn new(pool: PgPool) -> Self {
         QuestRepositoryForDb { pool }
+    }
+
+    #[cfg(test)]
+    /// テスト用の簡易版コンストラクタ
+    pub async fn with_url(url: &str) -> Self {
+        let pool = PgPool::connect(url).await.unwrap();
+        QuestRepositoryForDb::new(pool)
     }
 }
 
@@ -189,93 +191,6 @@ impl QuestRepository for QuestRepositoryForDb {
         .execute(&self.pool)
         .await?;
 
-        Ok(())
-    }
-}
-
-// とりあえず一旦HashMapにデータを保存しておく
-type QuestDatas = HashMap<String, QuestEntity>;
-
-#[derive(Debug, Clone)]
-pub struct QuestRepositoryForMemory {
-    store: Arc<RwLock<QuestDatas>>,
-}
-
-impl QuestRepositoryForMemory {
-    #[cfg(test)]
-    pub fn new() -> Self {
-        Self {
-            store: Arc::default(),
-        }
-    }
-
-    fn write_store_ref(&self) -> RwLockWriteGuard<QuestDatas> {
-        self.store.write().unwrap()
-    }
-
-    fn read_store_ref(&self) -> RwLockReadGuard<QuestDatas> {
-        self.store.read().unwrap()
-    }
-}
-
-#[async_trait]
-impl QuestRepository for QuestRepositoryForMemory {
-    async fn create(&self, payload: CreateQuest) -> anyhow::Result<QuestEntity> {
-        let mut store = self.write_store_ref();
-        let id = nanoid!();
-        let quest = QuestEntity::new(
-            id.clone(),
-            payload.title,
-            payload.description,
-            payload.price,
-            payload.difficulty,
-            payload.num_participate,
-            payload.num_clear,
-        );
-        store.insert(id, quest.clone());
-        Ok(quest)
-    }
-
-    async fn find(&self, id: String) -> anyhow::Result<QuestEntity> {
-        let store = self.read_store_ref();
-        let quest = store.get(&id).map(|quest| quest.clone()).unwrap();
-        Ok(quest)
-    }
-
-    async fn all(&self) -> anyhow::Result<Vec<QuestEntity>> {
-        let store = self.read_store_ref();
-        let quests = Vec::from_iter(store.values().cloned());
-        Ok(quests)
-    }
-
-    async fn update(&self, id: String, payload: UpdateQuest) -> anyhow::Result<QuestEntity> {
-        let mut store = self.write_store_ref();
-        let quest = store.get(&id).context(NotFound)?;
-        let title = payload.title.unwrap_or(quest.title.clone());
-        let description = payload.description.unwrap_or(quest.description.clone());
-        let price = payload.price.unwrap_or(quest.price.clone());
-        let difficulty = payload.difficulty.unwrap_or(quest.difficulty.clone());
-        let num_participate = payload
-            .num_participate
-            .unwrap_or(quest.num_participate.clone());
-        let num_clear = payload.num_clear.unwrap_or(quest.num_clear.clone());
-        let quest = QuestEntity {
-            id: quest.id.clone(),
-            title,
-            description,
-            price,
-            difficulty,
-            num_participate,
-            num_clear,
-            challenges: quest.challenges.clone(),
-        };
-        store.insert(id, quest.clone());
-        Ok(quest)
-    }
-
-    async fn delete(&self, id: String) -> anyhow::Result<()> {
-        let mut store = self.write_store_ref();
-        store.remove(&id).context(NotFound)?;
         Ok(())
     }
 }

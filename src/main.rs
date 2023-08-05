@@ -176,12 +176,12 @@ mod test {
     use tower::ServiceExt;
 
     use crate::repositories::{
-        challenge::{Challenge, ChallengeRepositoryForMemory, CreateChallenge},
-        quest::{CreateQuest, Difficulty, QuestEntity, QuestRepositoryForMemory},
-        user::{RegisterUser, UserEntity, UserRepositoryForMemory},
-        user_challenge::{CompleteChallenge, UserChallengeRepositoryForMemory},
-        user_quest::{ParticipateQuest, UserQuestRepositoryForMemory},
+        challenge::{Challenge, CreateChallenge},
+        quest::{CreateQuest, Difficulty, QuestEntity},
+        user::{RegisterUser, UserEntity},
     };
+
+    const DB_URL_FOR_TEST: &str = "postgres://admin:admin@localhost:5432/quests";
 
     fn build_req_with_empty(path: &str, method: Method) -> Request<Body> {
         Request::builder()
@@ -280,8 +280,8 @@ mod test {
             .to_string(),
         );
         let res = create_quest_routes(
-            QuestRepositoryForMemory::new(),
-            UserQuestRepositoryForMemory::new(),
+            QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
         )
         .oneshot(req)
         .await
@@ -294,7 +294,7 @@ mod test {
 
     #[tokio::test]
     async fn should_find_quest() {
-        let quest_repository = QuestRepositoryForMemory::new();
+        let quest_repository = QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
         let expected = QuestEntity::new(
             nanoid!(),
             "Test Find Quest".to_string(),
@@ -319,10 +319,13 @@ mod test {
 
         let req_path = format!("{}{}", "/quests/", created_quest.id);
         let req = build_req_with_empty(&req_path, Method::GET);
-        let res = create_quest_routes(quest_repository, UserQuestRepositoryForMemory::new())
-            .oneshot(req)
-            .await
-            .unwrap();
+        let res = create_quest_routes(
+            quest_repository,
+            UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
         let quest = res_to_quest(res).await;
 
         assert_eq!(expected, quest);
@@ -330,7 +333,7 @@ mod test {
 
     #[tokio::test]
     async fn should_all_quests() {
-        let quest_repository = QuestRepositoryForMemory::new();
+        let quest_repository = QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
         let expected = QuestEntity::new(
             nanoid!(),
             "Test All Quests".to_string(),
@@ -353,20 +356,23 @@ mod test {
             .expect("failed to create quest");
 
         let req = build_req_with_empty("/quests", Method::GET);
-        let res = create_quest_routes(quest_repository, UserQuestRepositoryForMemory::new())
-            .oneshot(req)
-            .await
-            .unwrap();
+        let res = create_quest_routes(
+            quest_repository.clone(),
+            UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
         let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
         let body: String = String::from_utf8(bytes.to_vec()).unwrap();
         let quests: Vec<QuestEntity> = serde_json::from_str(&body)
             .expect(&format!("cannot convert Quest instance. body {}", body));
-        assert_eq!(vec![expected], quests);
+        assert_eq!(vec![expected.clone()], quests);
     }
 
     #[tokio::test]
     async fn should_update_quest() {
-        let quest_repository = QuestRepositoryForMemory::new();
+        let quest_repository = QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
         let expected = QuestEntity::new(
             nanoid!(),
             "Test Update Quests".to_string(),
@@ -398,10 +404,13 @@ mod test {
              }"#
             .to_string(),
         );
-        let res = create_quest_routes(quest_repository, UserQuestRepositoryForMemory::new())
-            .oneshot(req)
-            .await
-            .unwrap();
+        let res = create_quest_routes(
+            quest_repository,
+            UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
         let quest = res_to_quest(res).await;
 
         assert_eq!(expected, quest);
@@ -409,7 +418,7 @@ mod test {
 
     #[tokio::test]
     async fn should_delete_quest() {
-        let quest_repository = QuestRepositoryForMemory::new();
+        let quest_repository = QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
         let created_quest = quest_repository
             .create(CreateQuest::new(
                 "Test Delete Quests".to_string(),
@@ -424,17 +433,22 @@ mod test {
 
         let req_path = format!("{}{}", "/quests/", created_quest.id);
         let req = build_req_with_empty(&req_path, Method::DELETE);
-        let res = create_quest_routes(quest_repository, UserQuestRepositoryForMemory::new())
-            .oneshot(req)
-            .await
-            .unwrap();
+        let res = create_quest_routes(
+            quest_repository,
+            UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
 
         assert_eq!(StatusCode::NO_CONTENT, res.status());
     }
 
     #[tokio::test]
     async fn should_register_user() {
-        let user_repository = UserRepositoryForMemory::new();
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
+            .await
+            .unwrap();
         let expected = UserEntity::new(
             nanoid!(),
             "Test User".to_string(),
@@ -467,7 +481,9 @@ mod test {
 
     #[tokio::test]
     async fn should_login_user() {
-        let user_repository = UserRepositoryForMemory::new();
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
+            .await
+            .unwrap();
         let created_user = user_repository
             .register(RegisterUser::new(
                 "Test User".to_string(),
@@ -501,7 +517,9 @@ mod test {
 
     #[tokio::test]
     async fn should_find_user() {
-        let user_repository = UserRepositoryForMemory::new();
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
+            .await
+            .unwrap();
         let created_user = user_repository
             .register(RegisterUser::new(
                 "Test User".to_string(),
@@ -527,7 +545,9 @@ mod test {
 
     #[tokio::test]
     async fn should_delete_user() {
-        let user_repository = UserRepositoryForMemory::new();
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
+            .await
+            .unwrap();
         let creared_user = user_repository
             .register(RegisterUser::new(
                 "Test User".to_string(),
@@ -547,37 +567,62 @@ mod test {
             .await
             .unwrap();
 
-        assert_eq!(StatusCode::NO_CONTENT, res.status());
+        let status = res.status();
+
+        assert_eq!(StatusCode::NO_CONTENT, status);
     }
 
     #[tokio::test]
     async fn should_participate_quest() {
-        let repository = UserQuestRepositoryForMemory::new();
+        // 事前準備
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let test_user = user_repository
+            .unwrap()
+            .register(RegisterUser::new(
+                "test_user".to_string(),
+                "test_email".to_string(),
+                "test_password".to_string(),
+            ))
+            .await
+            .unwrap();
+        let quest_repository = QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let test_quest = quest_repository
+            .create(CreateQuest::new(
+                "Test Quest".to_string(),
+                "This is a test quest.".to_string(),
+                0,
+                Difficulty::Normal,
+                12345,
+                123,
+            ))
+            .await
+            .unwrap();
 
-        let expected = ParticipateQuest {
-            user_id: "test".to_string(),
-            quest_id: "test".to_string(),
-        };
+        // テスト対象
+        let repository = UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
 
-        let req_path = format!("/quests/{}/participate", "test");
+        let req_path = format!("/quests/{}/participate", test_quest.id);
 
         let req = build_req_with_json(
             &req_path,
             Method::POST,
-            r#"{
-                "user_id": "test"
-            }"#
-            .to_string(),
+            format!("{{\"user_id\": \"{}\" }}", test_user.id).to_string(),
         );
 
-        create_quest_routes(QuestRepositoryForMemory::new(), repository.clone())
-            .oneshot(req)
+        create_quest_routes(
+            QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            repository.clone(),
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
+
+        let result = repository
+            .query_user_participating_quests(test_user.id)
             .await
             .unwrap();
 
-        let result = repository.read_stored_value();
-
-        assert_eq!(expected, result[0])
+        assert_eq!(vec![test_quest.id], result);
     }
 
     #[tokio::test]
@@ -605,8 +650,8 @@ mod test {
         );
 
         let res = create_challenge_routes(
-            ChallengeRepositoryForMemory::new(),
-            UserChallengeRepositoryForMemory::new(),
+            ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
         )
         .oneshot(req)
         .await
@@ -619,7 +664,7 @@ mod test {
 
     #[tokio::test]
     async fn should_find_challenge() {
-        let challenge_repository = ChallengeRepositoryForMemory::new();
+        let challenge_repository = ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
         let created_challenge = challenge_repository
             .create(CreateChallenge::new(
                 "Test Challenge".to_string(),
@@ -635,7 +680,7 @@ mod test {
         let req = build_req_with_empty(&req_path, Method::GET);
         let res = create_challenge_routes(
             challenge_repository,
-            UserChallengeRepositoryForMemory::new(),
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
         )
         .oneshot(req)
         .await
@@ -647,12 +692,12 @@ mod test {
 
     #[tokio::test]
     async fn should_find_challnege_by_quest_id() {
-        let challenge_repository = ChallengeRepositoryForMemory::new();
+        let challenge_repository = ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
         let created_challenge = challenge_repository
             .create(CreateChallenge::new(
                 "Test Challenge".to_string(),
                 "This is a test challenge".to_string(),
-                "test_id".to_string(),
+                nanoid::nanoid!(),
                 35.6895,
                 139.6917,
             ))
@@ -663,7 +708,7 @@ mod test {
         let req = build_req_with_empty(&req_path, Method::GET);
         let res = create_challenge_routes(
             challenge_repository,
-            UserChallengeRepositoryForMemory::new(),
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
         )
         .oneshot(req)
         .await
@@ -679,31 +724,53 @@ mod test {
 
     #[tokio::test]
     async fn should_complete_challenge() {
-        let repository = UserChallengeRepositoryForMemory::new();
+        // 事前準備
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let test_user = user_repository
+            .unwrap()
+            .register(RegisterUser::new(
+                "test_user".to_string(),
+                "test_email".to_string(),
+                "test_password".to_string(),
+            ))
+            .await
+            .unwrap();
+        let challenge_repository = ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let test_challenge = challenge_repository
+            .create(CreateChallenge::new(
+                "Test Challenge".to_string(),
+                "This is a test challenge".to_string(),
+                "test_id".to_string(),
+                35.6895,
+                139.6917,
+            ))
+            .await
+            .unwrap();
 
-        let expected = CompleteChallenge {
-            user_id: "test".to_string(),
-            challenge_id: "test".to_string(),
-        };
+        // テスト対象
+        let repository = UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
 
-        let path = format!("/challenges/{}/complete", "test");
+        let path = format!("/challenges/{}/complete", test_challenge.id);
 
         let req = build_req_with_json(
             &path,
             Method::POST,
-            r#"{
-                "user_id": "test"
-            }"#
-            .to_string(),
+            format!("{{\"user_id\": \"{}\" }}", test_user.id).to_string(),
         );
 
-        create_challenge_routes(ChallengeRepositoryForMemory::new(), repository.clone())
-            .oneshot(req)
+        create_challenge_routes(
+            ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            repository.clone(),
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
+
+        let result = repository
+            .query_user_completed_challenges(test_user.id)
             .await
             .unwrap();
 
-        let result = repository.read_stored_value();
-
-        assert_eq!(expected, result[0])
+        assert_eq!(result, vec![test_challenge.id])
     }
 }
