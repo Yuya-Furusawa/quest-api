@@ -34,7 +34,7 @@ impl ChallengeRepository for ChallengeRepositoryForDb {
     async fn create(&self, payload: CreateChallenge) -> anyhow::Result<Challenge> {
         let challenge = sqlx::query_as::<_, Challenge>(
             r#"
-				insert into challenges values ($1, $2, $3, $4, $5, $6)
+				insert into challenges values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 				returning *
 			"#,
         )
@@ -44,6 +44,10 @@ impl ChallengeRepository for ChallengeRepositoryForDb {
         .bind(payload.quest_id)
         .bind(payload.latitude)
         .bind(payload.longitude)
+        .bind(payload.stamp_name)
+        .bind(payload.stamp_image_color)
+        .bind(payload.stamp_image_gray)
+        .bind(payload.flavor_text)
         .fetch_one(&self.pool)
         .await?;
 
@@ -85,9 +89,14 @@ pub struct Challenge {
     pub quest_id: String,
     latitude: f64,
     longitude: f64,
+    stamp_name: String,
+    stamp_image_color: String,
+    stamp_image_gray: String,
+    flavor_text: String,
 }
 
 impl Challenge {
+    #[cfg(test)]
     pub fn new(
         id: String,
         name: String,
@@ -95,6 +104,10 @@ impl Challenge {
         quest_id: String,
         latitude: f64,
         longitude: f64,
+        stamp_name: String,
+        stamp_image_color: String,
+        stamp_image_gray: String,
+        flavor_text: String,
     ) -> Self {
         Self {
             id,
@@ -103,6 +116,10 @@ impl Challenge {
             quest_id,
             latitude,
             longitude,
+            stamp_name,
+            stamp_image_color,
+            stamp_image_gray,
+            flavor_text,
         }
     }
 }
@@ -123,6 +140,10 @@ pub struct CreateChallenge {
     quest_id: String,
     latitude: f64,
     longitude: f64,
+    stamp_name: String,
+    stamp_image_color: String,
+    stamp_image_gray: String,
+    flavor_text: String,
 }
 
 #[cfg(test)]
@@ -133,6 +154,10 @@ impl CreateChallenge {
         quest_id: String,
         latitude: f64,
         longitude: f64,
+        stamp_name: String,
+        stamp_image_color: String,
+        stamp_image_gray: String,
+        flavor_text: String,
     ) -> Self {
         Self {
             name,
@@ -140,6 +165,10 @@ impl CreateChallenge {
             quest_id,
             latitude,
             longitude,
+            stamp_name,
+            stamp_image_color,
+            stamp_image_gray,
+            flavor_text,
         }
     }
 }

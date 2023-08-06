@@ -634,6 +634,10 @@ mod test {
             "test_id".to_string(),
             35.6895,
             139.6917,
+            "Test Stamp".to_string(),
+            "test-stamp-image-color".to_string(),
+            "test-stamp-image-gray".to_string(),
+            "This is a test stamp".to_string(),
         );
 
         let req = build_req_with_json(
@@ -644,7 +648,11 @@ mod test {
                 "description": "This is a test challenge",
                 "quest_id": "test_id",
                 "latitude": 35.6895,
-                "longitude": 139.6917
+                "longitude": 139.6917,
+                "stamp_name": "Test Stamp",
+                "stamp_image_color": "test-stamp-image-color",
+                "stamp_image_gray": "test-stamp-image-gray",
+                "flavor_test": "This is a test stamp"
             }"#
             .to_string(),
         );
@@ -672,6 +680,10 @@ mod test {
                 "test_id".to_string(),
                 35.6895,
                 139.6917,
+                "Test Stamp".to_string(),
+                "test-stamp-image-color".to_string(),
+                "test-stamp-image-gray".to_string(),
+                "This is a test stamp".to_string(),
             ))
             .await
             .expect("failed to create challenge");
@@ -700,6 +712,10 @@ mod test {
                 nanoid::nanoid!(),
                 35.6895,
                 139.6917,
+                "Test Stamp".to_string(),
+                "test-stamp-image-color".to_string(),
+                "test-stamp-image-gray".to_string(),
+                "This is a test stamp".to_string(),
             ))
             .await
             .expect("failed to create challenge");
@@ -743,6 +759,10 @@ mod test {
                 "test_id".to_string(),
                 35.6895,
                 139.6917,
+                "Test Stamp".to_string(),
+                "test-stamp-image-color".to_string(),
+                "test-stamp-image-gray".to_string(),
+                "This is a test stamp".to_string(),
             ))
             .await
             .unwrap();
