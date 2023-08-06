@@ -652,7 +652,7 @@ mod test {
                 "stamp_name": "Test Stamp",
                 "stamp_image_color": "test-stamp-image-color",
                 "stamp_image_gray": "test-stamp-image-gray",
-                "flavor_test": "This is a test stamp"
+                "flavor_text": "This is a test stamp"
             }"#
             .to_string(),
         );
