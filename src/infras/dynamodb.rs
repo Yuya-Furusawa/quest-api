@@ -322,6 +322,10 @@ pub struct ChallengeItem {
     description: String,
     lat: f64,
     lon: f64,
+    stamp_name: String,
+    stamp_image_color: String,
+    stamp_image_gray: String,
+    flavor_text: String,
 }
 
 impl DynamoDB {
@@ -340,6 +344,16 @@ impl DynamoDB {
             )
             .item("ChallengeLat", AttributeValue::N(challenge.lat.to_string()))
             .item("ChallengeLon", AttributeValue::N(challenge.lon.to_string()))
+            .item("StampName", AttributeValue::S(challenge.stamp_name))
+            .item(
+                "StampImageColor",
+                AttributeValue::S(challenge.stamp_image_color),
+            )
+            .item(
+                "StampImageGray",
+                AttributeValue::S(challenge.stamp_image_gray),
+            )
+            .item("FlavorText", AttributeValue::S(challenge.flavor_text))
             .send()
             .await?;
         Ok(())
@@ -353,6 +367,10 @@ impl DynamoDB {
             description: item["ChallengeDescription"].as_s().unwrap().clone(),
             lat: item["ChallengeLat"].as_n().unwrap().parse::<f64>().unwrap(),
             lon: item["ChallengeLon"].as_n().unwrap().parse::<f64>().unwrap(),
+            stamp_name: item["StampName"].as_s().unwrap().clone(),
+            stamp_image_color: item["StampImageColor"].as_s().unwrap().clone(),
+            stamp_image_gray: item["StampImageGray"].as_s().unwrap().clone(),
+            flavor_text: item["FlavorText"].as_s().unwrap().clone(),
         }
     }
 
@@ -404,7 +422,7 @@ impl DynamoDB {
             .key("QuestId", AttributeValue::S(item.quest_id))
             .key("ChallengeId", AttributeValue::S(item.id))
             .update_expression(
-                "SET ChallengeTitle = :title, ChallengeDescription = :description, ChallengeLat = :lat, ChallengeLon = :lon",
+                "SET ChallengeTitle = :title, ChallengeDescription = :description, ChallengeLat = :lat, ChallengeLon = :lon, StampName = :stamp_name, StampImageColor = :stamp_image_color, StampImageGray = :stamp_image_gray, FlavorText = :flavor_text",
             )
             .expression_attribute_values(
                 ":title", AttributeValue::S(item.title))
@@ -414,6 +432,18 @@ impl DynamoDB {
                 ":lat", AttributeValue::N(item.lat.to_string()))
             .expression_attribute_values(
                 ":lon", AttributeValue::N(item.lon.to_string()),
+            )
+            .expression_attribute_values(
+                ":stamp_name", AttributeValue::S(item.stamp_name)
+            )
+            .expression_attribute_values(
+                ":stamp_image_color", AttributeValue::S(item.stamp_image_color)
+            )
+            .expression_attribute_values(
+                ":stamp_image_gray", AttributeValue::S(item.stamp_image_gray)
+            )
+            .expression_attribute_values(
+                ":flavor_text", AttributeValue::S(item.flavor_text)
             )
             .send()
             .await?;
@@ -587,6 +617,10 @@ mod tests {
             description: "This is a test challenge".to_string(),
             lat: 35.681236,
             lon: 139.767125,
+            stamp_name: "Test Stamp".to_string(),
+            stamp_image_color: "test-stamp-color".to_string(),
+            stamp_image_gray: "test-stamp-gray".to_string(),
+            flavor_text: "This is a test stamp".to_string(),
         };
         db.put_challenge(challenge.clone()).await.unwrap();
 
@@ -651,6 +685,10 @@ mod tests {
             description: "This is a test challenge 1".to_string(),
             lat: 35.681236,
             lon: 139.767125,
+            stamp_name: "Test Stamp 1".to_string(),
+            stamp_image_color: "test-stamp-color-1".to_string(),
+            stamp_image_gray: "test-stamp-gray-1".to_string(),
+            flavor_text: "This is a test stamp 1".to_string(),
         };
         db.put_challenge(challenge1.clone()).await.unwrap();
 
@@ -661,6 +699,10 @@ mod tests {
             description: "This is a test challenge 2".to_string(),
             lat: 35.681236,
             lon: 139.767125,
+            stamp_name: "Test Stamp 2".to_string(),
+            stamp_image_color: "test-stamp-color-2".to_string(),
+            stamp_image_gray: "test-stamp-gray-2".to_string(),
+            flavor_text: "This is a test stamp 2".to_string(),
         };
         db.put_challenge(challenge2.clone()).await.unwrap();
 
