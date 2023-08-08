@@ -650,8 +650,8 @@ mod test {
                 "latitude": 35.6895,
                 "longitude": 139.6917,
                 "stamp_name": "Test Stamp",
-                "stamp_image_color": "test-stamp-image-color",
-                "stamp_image_gray": "test-stamp-image-gray",
+                "stamp_color_image_url": "test-stamp-image-color",
+                "stamp_gray_image_url": "test-stamp-image-gray",
                 "flavor_text": "This is a test stamp"
             }"#
             .to_string(),

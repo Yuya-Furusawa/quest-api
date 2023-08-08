@@ -45,8 +45,8 @@ impl ChallengeRepository for ChallengeRepositoryForDb {
         .bind(payload.latitude)
         .bind(payload.longitude)
         .bind(payload.stamp_name)
-        .bind(payload.stamp_image_color)
-        .bind(payload.stamp_image_gray)
+        .bind(payload.stamp_color_image_url)
+        .bind(payload.stamp_gray_image_url)
         .bind(payload.flavor_text)
         .fetch_one(&self.pool)
         .await?;
@@ -90,8 +90,8 @@ pub struct Challenge {
     latitude: f64,
     longitude: f64,
     stamp_name: String,
-    stamp_image_color: String,
-    stamp_image_gray: String,
+    stamp_color_image_url: String,
+    stamp_gray_image_url: String,
     flavor_text: String,
 }
 
@@ -105,8 +105,8 @@ impl Challenge {
         latitude: f64,
         longitude: f64,
         stamp_name: String,
-        stamp_image_color: String,
-        stamp_image_gray: String,
+        stamp_color_image_url: String,
+        stamp_gray_image_url: String,
         flavor_text: String,
     ) -> Self {
         Self {
@@ -117,8 +117,8 @@ impl Challenge {
             latitude,
             longitude,
             stamp_name,
-            stamp_image_color,
-            stamp_image_gray,
+            stamp_color_image_url,
+            stamp_gray_image_url,
             flavor_text,
         }
     }
@@ -141,8 +141,8 @@ pub struct CreateChallenge {
     latitude: f64,
     longitude: f64,
     stamp_name: String,
-    stamp_image_color: String,
-    stamp_image_gray: String,
+    stamp_color_image_url: String,
+    stamp_gray_image_url: String,
     flavor_text: String,
 }
 
@@ -155,8 +155,8 @@ impl CreateChallenge {
         latitude: f64,
         longitude: f64,
         stamp_name: String,
-        stamp_image_color: String,
-        stamp_image_gray: String,
+        stamp_color_image_url: String,
+        stamp_gray_image_url: String,
         flavor_text: String,
     ) -> Self {
         Self {
@@ -166,8 +166,8 @@ impl CreateChallenge {
             latitude,
             longitude,
             stamp_name,
-            stamp_image_color,
-            stamp_image_gray,
+            stamp_color_image_url,
+            stamp_gray_image_url,
             flavor_text,
         }
     }
