@@ -9,6 +9,10 @@ pub trait UserQuestRepository: Clone + std::marker::Send + std::marker::Sync + '
         user_id: String,
         quest_id: String,
     ) -> anyhow::Result<()>;
+    async fn get_participated_quests_by_user_id(
+        &self,
+        user_id: String,
+    ) -> anyhow::Result<Vec<String>>;
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +70,34 @@ impl UserQuestRepository for UserQuestRepositoryForDb {
 
         anyhow::Ok(())
     }
+
+    async fn get_participated_quests_by_user_id(
+        &self,
+        user_id: String,
+    ) -> anyhow::Result<Vec<String>> {
+        let quests = sqlx::query_as::<_, UserQuestFromRow>(
+            r#"
+                select * from user_participating_quests where user_id=$1;
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|_| Vec::<String>::new())
+        .unwrap();
+
+        let quest_ids = quests.iter().map(|x| x.quest_id.clone()).collect();
+
+        anyhow::Ok(quest_ids)
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, FromRow)]
+struct UserQuestFromRow {
+    id: i32,
+    user_id: String,
+    quest_id: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, FromRow, PartialEq)]
