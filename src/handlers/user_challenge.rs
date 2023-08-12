@@ -20,3 +20,15 @@ pub async fn complete_challenge<T: UserChallengeRepository>(
 
     Ok(StatusCode::CREATED)
 }
+
+pub async fn get_completed_challenges<T: UserChallengeRepository>(
+    Path(id): Path<String>,
+    Extension(repository): Extension<Arc<T>>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let challenge_id = repository
+        .get_completed_challenges_by_user_id(id)
+        .await
+        .or(Err(StatusCode::NOT_FOUND))?;
+
+    Ok((StatusCode::OK, Json(challenge_id)))
+}
