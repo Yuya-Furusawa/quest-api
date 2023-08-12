@@ -20,3 +20,15 @@ pub async fn participate_quest<T: UserQuestRepository>(
 
     Ok(StatusCode::CREATED)
 }
+
+pub async fn get_participated_quests<T: UserQuestRepository>(
+    Path(id): Path<String>,
+    Extension(repository): Extension<Arc<T>>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let quest_ids = repository
+        .get_participated_quests_by_user_id(id)
+        .await
+        .or(Err(StatusCode::NOT_FOUND))?;
+
+    Ok((StatusCode::OK, Json(quest_ids)))
+}

@@ -19,8 +19,8 @@ use crate::handlers::{
     challenge::{create_challenge, find_challenge, find_challenge_by_quest_id},
     quest::{all_quests, create_quest, delete_quest, find_quest, update_quest},
     user::{auth_user, delete_user, find_user, login_user, register_user},
-    user_challenge::complete_challenge,
-    user_quest::participate_quest,
+    user_challenge::{complete_challenge, get_completed_challenges},
+    user_quest::{get_participated_quests, participate_quest},
 };
 use crate::repositories::{
     challenge::{ChallengeRepository, ChallengeRepositoryForDb},
@@ -80,7 +80,12 @@ fn create_app<
     userchallenge_repository: Q,
     secret_key: String,
 ) -> Router {
-    let user_routes = create_user_routes(user_repository, secret_key);
+    let user_routes = create_user_routes(
+        user_repository,
+        secret_key,
+        userquest_repository.clone(),
+        userchallenge_repository.clone(),
+    );
     let quest_routes = create_quest_routes(quest_repository, userquest_repository);
     let challenge_routes = create_challenge_routes(challenge_repository, userchallenge_repository);
 
@@ -111,7 +116,12 @@ pub struct UserHandlerState<T: UserRepository> {
     secret_key: String,
 }
 
-fn create_user_routes<T: UserRepository>(user_repository: T, secret_key: String) -> Router {
+fn create_user_routes<T: UserRepository, S: UserQuestRepository, U: UserChallengeRepository>(
+    user_repository: T,
+    secret_key: String,
+    userquest_repository: S,
+    userchallenge_repository: U,
+) -> Router {
     let user_state = UserHandlerState {
         user_repository: Arc::new(user_repository),
         secret_key,
@@ -122,7 +132,17 @@ fn create_user_routes<T: UserRepository>(user_repository: T, secret_key: String)
         .route("/login", post(login_user::<T>))
         .route("/users/:id", get(find_user::<T>).delete(delete_user::<T>))
         .route("/user/auth", get(auth_user::<T>))
+        .route(
+            "/users/:id/participated_quests",
+            get(get_participated_quests::<S>),
+        )
+        .route(
+            "/users/:id/completed_challenges",
+            get(get_completed_challenges::<U>),
+        )
         .layer(Extension(user_state))
+        .layer(Extension(Arc::new(userquest_repository)))
+        .layer(Extension(Arc::new(userchallenge_repository)))
 }
 
 fn create_quest_routes<T: QuestRepository, S: UserQuestRepository>(
@@ -413,6 +433,9 @@ mod test {
         let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
             .await
             .unwrap();
+        let userquest_repository = UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let userchallenge_repository =
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
         let expected = UserEntity::new(
             nanoid!(),
             "Test User".to_string(),
@@ -432,10 +455,15 @@ mod test {
 
         let secret_key = "secret_key".to_string();
 
-        let res = create_user_routes(user_repository, secret_key)
-            .oneshot(req)
-            .await
-            .expect("failed to register user");
+        let res = create_user_routes(
+            user_repository,
+            secret_key,
+            userquest_repository,
+            userchallenge_repository,
+        )
+        .oneshot(req)
+        .await
+        .expect("failed to register user");
 
         let (user, header_map) = res_to_usercookie(res).await;
 
@@ -448,6 +476,9 @@ mod test {
         let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
             .await
             .unwrap();
+        let userquest_repository = UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let userchallenge_repository =
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
         let created_user = user_repository
             .register(RegisterUser::new(
                 "Test User".to_string(),
@@ -469,10 +500,15 @@ mod test {
 
         let secret_key = "secret_key".to_string();
 
-        let res = create_user_routes(user_repository, secret_key)
-            .oneshot(req)
-            .await
-            .expect("failed to login user");
+        let res = create_user_routes(
+            user_repository,
+            secret_key,
+            userquest_repository,
+            userchallenge_repository,
+        )
+        .oneshot(req)
+        .await
+        .expect("failed to login user");
         let (user, header_map) = res_to_usercookie(res).await;
 
         assert_eq!(created_user, user);
@@ -484,6 +520,9 @@ mod test {
         let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
             .await
             .unwrap();
+        let userquest_repository = UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let userchallenge_repository =
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
         let created_user = user_repository
             .register(RegisterUser::new(
                 "Test User".to_string(),
@@ -498,10 +537,15 @@ mod test {
 
         let secret_key = "secret_key".to_string();
 
-        let res = create_user_routes(user_repository, secret_key)
-            .oneshot(req)
-            .await
-            .expect("failed to find user");
+        let res = create_user_routes(
+            user_repository,
+            secret_key,
+            userquest_repository,
+            userchallenge_repository,
+        )
+        .oneshot(req)
+        .await
+        .expect("failed to find user");
         let user = res_to_user(res).await;
 
         assert_eq!(created_user, user);
@@ -512,6 +556,9 @@ mod test {
         let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
             .await
             .unwrap();
+        let userquest_repository = UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let userchallenge_repository =
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
         let creared_user = user_repository
             .register(RegisterUser::new(
                 "Test User".to_string(),
@@ -526,10 +573,15 @@ mod test {
 
         let secret_key = "secret_key".to_string();
 
-        let res = create_user_routes(user_repository, secret_key)
-            .oneshot(req)
-            .await
-            .unwrap();
+        let res = create_user_routes(
+            user_repository,
+            secret_key,
+            userquest_repository,
+            userchallenge_repository,
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
 
         let status = res.status();
 
