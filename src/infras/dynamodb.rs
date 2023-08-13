@@ -181,38 +181,6 @@ pub struct QuestItem {
     pub id: String,
     pub title: String,
     pub description: String,
-    pub price: i32,
-    pub difficulty: Difficulty,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Difficulty {
-    Easy,
-    Normal,
-    Hard,
-}
-
-impl std::str::FromStr for Difficulty {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Easy" => Ok(Self::Easy),
-            "Normal" => Ok(Self::Normal),
-            "Hard" => Ok(Self::Hard),
-            _ => Err(anyhow::anyhow!("Invalid difficulty : {}", s)),
-        }
-    }
-}
-
-impl ToString for Difficulty {
-    fn to_string(&self) -> String {
-        match self {
-            Self::Easy => "Easy".to_string(),
-            Self::Normal => "Normal".to_string(),
-            Self::Hard => "Hard".to_string(),
-        }
-    }
 }
 
 impl DynamoDB {
@@ -225,11 +193,6 @@ impl DynamoDB {
             .item("QuestId", AttributeValue::S(quest.id))
             .item("QuestTitle", AttributeValue::S(quest.title))
             .item("QuestDescription", AttributeValue::S(quest.description))
-            .item("QuestPrice", AttributeValue::N(quest.price.to_string()))
-            .item(
-                "QuestDifficulty",
-                AttributeValue::S(quest.difficulty.to_string()),
-            )
             .send()
             .await?;
         Ok(())
@@ -240,12 +203,6 @@ impl DynamoDB {
             id: item["QuestId"].as_s().unwrap().clone(),
             title: item["QuestTitle"].as_s().unwrap().clone(),
             description: item["QuestDescription"].as_s().unwrap().clone(),
-            price: item["QuestPrice"].as_n().unwrap().parse::<i32>().unwrap(),
-            difficulty: item["QuestDifficulty"]
-                .as_s()
-                .unwrap()
-                .parse::<Difficulty>()
-                .unwrap(),
         }
     }
 
@@ -281,18 +238,9 @@ impl DynamoDB {
             .update_item()
             .table_name(Self::QUEST_TABLE_NAME)
             .key("QuestId", AttributeValue::S(item.id))
-            .update_expression(
-                "SET QuestTitle = :title, QuestDescription = :description, QuestPrice = :price, QuestDifficulty = :difficulty",
-            )
-            .expression_attribute_values(
-                ":title", AttributeValue::S(item.title))
-            .expression_attribute_values(
-                ":description", AttributeValue::S(item.description))
-            .expression_attribute_values(
-                ":price", AttributeValue::N(item.price.to_string()))
-            .expression_attribute_values(
-                ":difficulty", AttributeValue::S(item.difficulty.to_string()),
-            )
+            .update_expression("SET QuestTitle = :title, QuestDescription = :description")
+            .expression_attribute_values(":title", AttributeValue::S(item.title))
+            .expression_attribute_values(":description", AttributeValue::S(item.description))
             .send()
             .await?;
         Ok(())
@@ -548,8 +496,6 @@ mod tests {
             id: "test-quest".to_string(),
             title: "Test Quest".to_string(),
             description: "This is a test quest".to_string(),
-            price: 100,
-            difficulty: Difficulty::Easy,
         };
         db.put_quest(quest.clone()).await.unwrap();
 
@@ -561,7 +507,7 @@ mod tests {
         assert_eq!(queried_quests[0], quest);
 
         let updated_quest = QuestItem {
-            difficulty: Difficulty::Normal,
+            description: "Someone updated this quest".to_string(),
             ..quest
         };
         db.update_quest(updated_quest.clone()).await.unwrap();
