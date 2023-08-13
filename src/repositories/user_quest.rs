@@ -83,7 +83,7 @@ impl UserQuestRepository for UserQuestRepositoryForDb {
         .bind(user_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|_| Vec::<String>::new())
+        .map_err(|_| Vec::<UserQuestFromRow>::new())
         .unwrap();
 
         let quest_ids = quests.iter().map(|x| x.quest_id.clone()).collect();
@@ -95,7 +95,6 @@ impl UserQuestRepository for UserQuestRepositoryForDb {
 #[allow(dead_code)]
 #[derive(Debug, Clone, FromRow)]
 struct UserQuestFromRow {
-    id: i32,
     user_id: String,
     quest_id: String,
 }
