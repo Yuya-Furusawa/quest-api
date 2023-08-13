@@ -84,7 +84,7 @@ impl UserChallengeRepository for UserChallengeRepositoryForDb {
         .bind(user_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|_| Vec::<String>::new())
+        .map_err(|_| Vec::<UserChallengeFromRow>::new())
         .unwrap();
 
         let quest_ids = challenges.iter().map(|x| x.challenge_id.clone()).collect();
@@ -96,7 +96,6 @@ impl UserChallengeRepository for UserChallengeRepositoryForDb {
 #[allow(dead_code)]
 #[derive(Debug, Clone, FromRow)]
 struct UserChallengeFromRow {
-    id: i32,
     user_id: String,
     challenge_id: String,
 }
