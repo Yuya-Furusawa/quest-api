@@ -638,6 +638,101 @@ mod test {
     }
 
     #[tokio::test]
+    async fn should_get_participated_quests() {
+        // ユーザーの作成
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
+            .await
+            .unwrap();
+        let test_user = user_repository
+            .register(RegisterUser::new(
+                "test_user".to_string(),
+                "test_email".to_string(),
+                "test_password".to_string(),
+            ))
+            .await
+            .unwrap();
+
+        // クエストの作成
+        let quest_repository = QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let test_quest = quest_repository
+            .create(CreateQuest::new(
+                "Test Quest".to_string(),
+                "This is a test quest.".to_string(),
+            ))
+            .await
+            .unwrap();
+
+        // クエスト参加を保存する
+        let userquest_repository = UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let _ = userquest_repository
+            .save_quest_participate_event(test_user.id.clone(), test_quest.id.clone())
+            .await;
+
+        // テスト対象
+        let userchallenge_repository =
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let req_path = format!("/users/{}/participated_quests", test_user.id.clone());
+        let req = build_req_with_empty(&req_path, Method::GET);
+        let secret_key = "secret-key".to_string();
+        let res = create_user_routes(
+            user_repository.clone(),
+            secret_key,
+            userquest_repository,
+            userchallenge_repository,
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
+        let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
+        let body: String = String::from_utf8(bytes.to_vec()).unwrap();
+        let quest_ids: Vec<String> = serde_json::from_str(&body).expect(&format!(
+            "cannot convert Vec<String> instance. body {}",
+            body
+        ));
+        assert_eq!(vec![test_quest.id.clone()], quest_ids);
+    }
+
+    #[tokio::test]
+    async fn should_return_empty_vec_when_zero_patricipated_quest() {
+        // ユーザーの作成
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
+            .await
+            .unwrap();
+        let test_user = user_repository
+            .register(RegisterUser::new(
+                "test_user".to_string(),
+                "test_email".to_string(),
+                "test_password".to_string(),
+            ))
+            .await
+            .unwrap();
+
+        // テスト対象
+        let userquest_repository = UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let userchallenge_repository =
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let req_path = format!("/users/{}/participated_quests", test_user.id.clone());
+        let req = build_req_with_empty(&req_path, Method::GET);
+        let secret_key = "secret-key".to_string();
+        let res = create_user_routes(
+            user_repository.clone(),
+            secret_key,
+            userquest_repository,
+            userchallenge_repository,
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
+        let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
+        let body: String = String::from_utf8(bytes.to_vec()).unwrap();
+        let quest_ids: Vec<String> = serde_json::from_str(&body).expect(&format!(
+            "cannot convert Vec<String> instance. body {}",
+            body
+        ));
+        assert_eq!(Vec::<String>::new(), quest_ids);
+    }
+
+    #[tokio::test]
     async fn should_create_challenge() {
         let expected = Challenge::new(
             nanoid!(),
@@ -804,5 +899,107 @@ mod test {
             .unwrap();
 
         assert_eq!(result, vec![test_challenge.id])
+    }
+
+    #[tokio::test]
+    async fn should_get_completed_challenges() {
+        // ユーザーの作成
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
+            .await
+            .unwrap();
+        let test_user = user_repository
+            .register(RegisterUser::new(
+                "test_user".to_string(),
+                "test_email".to_string(),
+                "test_password".to_string(),
+            ))
+            .await
+            .unwrap();
+
+        // チャレンジの作成
+        let challenge_repository = ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let test_challenge = challenge_repository
+            .create(CreateChallenge::new(
+                "Test Challenge".to_string(),
+                "This is a test challenge".to_string(),
+                "test_id".to_string(),
+                35.6895,
+                139.6917,
+                "Test Stamp".to_string(),
+                "test-stamp-image-color".to_string(),
+                "test-stamp-image-gray".to_string(),
+                "This is a test stamp".to_string(),
+            ))
+            .await
+            .unwrap();
+
+        // クエスト参加を保存する
+        let userchallenge_repository =
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let _ = userchallenge_repository
+            .save_challenge_complete_event(test_user.id.clone(), test_challenge.id.clone())
+            .await;
+
+        // テスト対象
+        let userquest_repository = UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let req_path = format!("/users/{}/completed_challenges", test_user.id.clone());
+        let req = build_req_with_empty(&req_path, Method::GET);
+        let secret_key = "secret-key".to_string();
+        let res = create_user_routes(
+            user_repository.clone(),
+            secret_key,
+            userquest_repository,
+            userchallenge_repository,
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
+        let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
+        let body: String = String::from_utf8(bytes.to_vec()).unwrap();
+        let challenge_ids: Vec<String> = serde_json::from_str(&body).expect(&format!(
+            "cannot convert Vec<String> instance. body {}",
+            body
+        ));
+        assert_eq!(vec![test_challenge.id.clone()], challenge_ids);
+    }
+
+    #[tokio::test]
+    async fn should_return_empty_vec_when_zero_completed_challenge() {
+        // ユーザーの作成
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
+            .await
+            .unwrap();
+        let test_user = user_repository
+            .register(RegisterUser::new(
+                "test_user".to_string(),
+                "test_email".to_string(),
+                "test_password".to_string(),
+            ))
+            .await
+            .unwrap();
+
+        // テスト対象
+        let userquest_repository = UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let userchallenge_repository =
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let req_path = format!("/users/{}/completed_challenges", test_user.id.clone());
+        let req = build_req_with_empty(&req_path, Method::GET);
+        let secret_key = "secret-key".to_string();
+        let res = create_user_routes(
+            user_repository.clone(),
+            secret_key,
+            userquest_repository,
+            userchallenge_repository,
+        )
+        .oneshot(req)
+        .await
+        .unwrap();
+        let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
+        let body: String = String::from_utf8(bytes.to_vec()).unwrap();
+        let quest_ids: Vec<String> = serde_json::from_str(&body).expect(&format!(
+            "cannot convert Vec<String> instance. body {}",
+            body
+        ));
+        assert_eq!(Vec::<String>::new(), quest_ids);
     }
 }
