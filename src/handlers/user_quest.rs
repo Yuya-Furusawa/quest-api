@@ -46,5 +46,16 @@ pub async fn get_participated_quests<T: UserQuestRepository, S: UserChallengeRep
         .await
         .or(Err(StatusCode::NOT_FOUND))?;
 
-    Ok((StatusCode::OK, Json(quest_ids)))
+        let decoded_token = decode_jwt(cookie_token, &secret_key).unwrap();
+
+        let quest_ids = state
+            .userquest_repository
+            .get_participated_quests_by_user_id(decoded_token.claims.user_id)
+            .await
+            .or(Err(StatusCode::NOT_FOUND))?;
+
+        return Ok((StatusCode::OK, Json(quest_ids)));
+    }
+
+    return Err(StatusCode::UNAUTHORIZED);
 }
