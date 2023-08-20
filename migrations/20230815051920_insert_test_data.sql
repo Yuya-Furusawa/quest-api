@@ -1,0 +1,277 @@
+INSERT INTO quests VALUES ('testquest', '23区すべての区役所を訪れるスタンプラリー', '東京23区すべての区役所を訪れて東京都マスターになろう！');
+INSERT INTO challenges VALUES (
+  'testchallenge1',
+  '足立区の区役所を訪れる',
+  '足立区役所に行こう！',
+  'testquest',
+  '35.77514494456143',
+  '139.80448866943198',
+  '足立区',
+  'http://localhost:4566/quest-app-images-bucket/adachi_color.png',
+  'http://localhost:4566/quest-app-images-bucket/adachi_monoclo.png',
+  '足立区民（アローラのすがた）'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge2',
+  '荒川区の区役所を訪れる',
+  '荒川区役所に行こう！',
+  'testquest',
+  '35.73636037941233',
+  '139.78324823271583',
+  '荒川区',
+  'http://localhost:4566/quest-app-images-bucket/arakawaku_color.png',
+  'http://localhost:4566/quest-app-images-bucket/arakawaku_monoclo.png',
+  '荒川区民にとって荒川はガンジス川である。しかし荒川区に荒川は流れていない'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge3',
+  '文京区の区役所を訪れる',
+  '文京区役所に行こう！',
+  'testquest',
+  '35.70830442633105',
+  '139.75219807806806',
+  '文京区',
+  'http://localhost:4566/quest-app-images-bucket/bunkyoku_color.png',
+  'http://localhost:4566/quest-app-images-bucket/bunkyoku_monoclo.png',
+  '文京区には東京大学があります'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge4',
+  '千代田区の区役所を訪れる',
+  '千代田区役所に行こう！',
+  'testquest',
+  '35.694200612944705',
+  '139.75344659641138',
+  '千代田区',
+  'http://localhost:4566/quest-app-images-bucket/chiyodaku_color.png',
+  'http://localhost:4566/quest-app-images-bucket/chiyodaku_monoclo.png',
+  '江戸城ってこんな感じだったのかなぁ...'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge5',
+  '中央区の区役所を訪れる',
+  '中央区役所に行こう！',
+  'testquest',
+  '35.670850770265965',
+  '139.77197223873802',
+  '中央区',
+  'http://localhost:4566/quest-app-images-bucket/chuoku_color.png',
+  'http://localhost:4566/quest-app-images-bucket/chuoku_monoclo.png',
+  '銀座でショッピング！（強盗に注意）'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge6',
+  '江戸川区の区役所を訪れる',
+  '江戸川区役所に行こう！',
+  'testquest',
+  '35.706813076150375',
+  '139.86845918292065',
+  '江戸川区',
+  'http://localhost:4566/quest-app-images-bucket/edogawaku_color.png',
+  'http://localhost:4566/quest-app-images-bucket/edogawaku_monoclo.png',
+  'ボートレースしにおいでよ江戸川区'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge7',
+  '板橋区の区役所を訪れる',
+  '板橋区役所に行こう！',
+  'testquest',
+  '35.75127430140424',
+  '139.70951353389958',
+  '板橋区',
+  'http://localhost:4566/quest-app-images-bucket/itabashiku_color.png',
+  'http://localhost:4566/quest-app-images-bucket/itabashiku_monoclo.png',
+  '板橋区はファミリーにとって住みよい町です（すいません、それ以外の魅力は見つかりませんでした）'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge8',
+  '葛飾区の区役所を訪れる',
+  '葛飾区役所に行こう！',
+  'testquest',
+  '35.74369926658082',
+  '139.84721561100466',
+  '葛飾区',
+  'http://localhost:4566/quest-app-images-bucket/katsusikaku_color.png',
+  'http://localhost:4566/quest-app-images-bucket/katsusikaku_monoclo.png',
+  'こちら葛飾区'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge9',
+  '北区の区役所を訪れる',
+  '北区役所に行こう！',
+  'testquest',
+  '35.75312261773068',
+  '139.73399779826715',
+  '北区',
+  'http://localhost:4566/quest-app-images-bucket/kitaku_color.png',
+  'http://localhost:4566/quest-app-images-bucket/kitaku_monoclo.png',
+  '北区では昼から飲酒する人がマジョリティです'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge10',
+  '江東区の区役所を訪れる',
+  '江東区役所に行こう！',
+  'testquest',
+  '35.6730806171568',
+  '139.8172782099019',
+  '江東区',
+  'http://localhost:4566/quest-app-images-bucket/kotoku_color.png',
+  'http://localhost:4566/quest-app-images-bucket/kotoku_monoclo.png',
+  '江東区ではスケートボードが盛んです'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge11',
+  '目黒区の区役所を訪れる',
+  '目黒区役所に行こう！',
+  'testquest',
+  '35.64153475469307',
+  '139.69816182524548',
+  '目黒区',
+  'http://localhost:4566/quest-app-images-bucket/meguro_color.png',
+  'http://localhost:4566/quest-app-images-bucket/meguro_monoclo.png',
+  'みんな大好き目黒川'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge12',
+  '港区の区役所を訪れる',
+  '港区役所に行こう！',
+  'testquest',
+  '35.658153831924',
+  '139.7514693675736',
+  '港区',
+  'http://localhost:4566/quest-app-images-bucket/minatoku_color.png',
+  'http://localhost:4566/quest-app-images-bucket/minatoku_monoclo.png',
+  '港区といえば東京タワー！（決して六本木・西麻布ではありません）'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge13',
+  '中野区の区役所を訪れる',
+  '中野区役所に行こう！',
+  'testquest',
+  '35.70737592742804',
+  '139.66373358106694',
+  '中野区',
+  'http://localhost:4566/quest-app-images-bucket/nakanoku_color.png',
+  'http://localhost:4566/quest-app-images-bucket/nakanoku_monoclo.png',
+  'サンプラザ中野くんは、日本のミュージシャン、作家。アミューズ所属。「山口のばら」名義で作詞も行っている。身長181cm、体重74kg。血液型はB型。左利き。スキンヘッドとサングラスがトレードマーク。中野裕貴とも。 山梨県甲府市生まれ、千葉県育ち。千葉県立東葛飾高等学校卒業、早稲田大学政治経済学部政治学科除籍。'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge14',
+  '練馬区の区役所を訪れる',
+  '練馬区役所に行こう！',
+  'testquest',
+  '35.735941330803',
+  '139.65172225223205',
+  '練馬区',
+  'http://localhost:4566/quest-app-images-bucket/nerimaku_color.png',
+  'http://localhost:4566/quest-app-images-bucket/nerimaku_monoclo.png',
+  '練馬区は23区で一番公園の多い区です'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge15',
+  '大田区の区役所を訪れる',
+  '大田区役所に行こう！',
+  'testquest',
+  '35.56139921803839',
+  '139.7160623982595',
+  '大田区',
+  'http://localhost:4566/quest-app-images-bucket/ootaku_color.png',
+  'http://localhost:4566/quest-app-images-bucket/ootaku_monoclo.png',
+  '羽田空港は大田区にあります'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge16',
+  '世田谷区の区役所を訪れる',
+  '世田谷区役所に行こう！',
+  'testquest',
+  '35.64673770624585',
+  '139.65333985408193',
+  '世田谷区',
+  'http://localhost:4566/quest-app-images-bucket/setagayaku_color.png',
+  'http://localhost:4566/quest-app-images-bucket/setagayaku_monoclo.png',
+  '世田谷区民のアフタヌーンティー経験率は60%を超え、アメリカにおける銃所持率を上回っています（要検証）'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge17',
+  '渋谷区の区役所を訪れる',
+  '渋谷区役所に行こう！',
+  'testquest',
+  '35.66382363931477',
+  '139.69774089641004',
+  '渋谷区',
+  'http://localhost:4566/quest-app-images-bucket/shibuya_color.png',
+  'http://localhost:4566/quest-app-images-bucket/shibuya_monoclo.png',
+  '渋谷109'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge18',
+  '品川区の区役所を訪れる',
+  '品川区役所に行こう！',
+  'testquest',
+  '35.609380156988024',
+  '139.730278696408',
+  '品川区',
+  'http://localhost:4566/quest-app-images-bucket/shinagawa_color.png',
+  'http://localhost:4566/quest-app-images-bucket/shinagawa_monoclo.png',
+  '品川から新幹線乗っても自由席空いてない'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge19',
+  '新宿区の区役所を訪れる',
+  '新宿区役所に行こう！',
+  'testquest',
+  '35.694089499789854',
+  '139.70340735408382',
+  '新宿区',
+  'http://localhost:4566/quest-app-images-bucket/shinjuku_color.png',
+  'http://localhost:4566/quest-app-images-bucket/shinjuku_monoclo.png',
+  '新宿区役所は歌舞伎町の中にあります（なんで？）'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge20',
+  '墨田区の区役所を訪れる',
+  '墨田区役所に行こう！',
+  'testquest',
+  '35.710881103208585',
+  '139.80169751175703',
+  '墨田区',
+  'http://localhost:4566/quest-app-images-bucket/skytree_color.png',
+  'http://localhost:4566/quest-app-images-bucket/skytree_monoclo.png',
+  'スカイツリーは墨田区、そして東京の象徴'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge21',
+  '杉並区の区役所を訪れる',
+  '杉並区役所に行こう！',
+  'testquest',
+  '35.69974165307776',
+  '139.6363076233943',
+  '杉並区',
+  'http://localhost:4566/quest-app-images-bucket/suginamiku_color.png',
+  'http://localhost:4566/quest-app-images-bucket/suginamiku_monoclo.png',
+  '杉並区高円寺ではたくさんの路上ミュージシャンがいます。その7割はただブルーハーツを歌っているだけです。'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge22',
+  '台東区の区役所を訪れる',
+  '台東区役所に行こう！',
+  'testquest',
+  '35.712750865115815',
+  '139.7800529982657',
+  '台東区',
+  'http://localhost:4566/quest-app-images-bucket/taitoku_color.png',
+  'http://localhost:4566/quest-app-images-bucket/taitoku_monoclo.png',
+  '台東区の客寄せパンダ'
+);
+INSERT INTO challenges VALUES (
+  'testchallenge23',
+  '豊島区の区役所を訪れる',
+  '豊島区役所に行こう！',
+  'testquest',
+  '35.726384689000575',
+  '139.7167353271024',
+  '豊島区',
+  'http://localhost:4566/quest-app-images-bucket/toshima_color.png',
+  'http://localhost:4566/quest-app-images-bucket/toshimaku_monoclo.png',
+  '豊島区の天空闘技場ことサンシャインシティ'
+);
