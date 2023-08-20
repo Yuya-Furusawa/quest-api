@@ -57,5 +57,5 @@ pub async fn get_participated_quests<T: UserQuestRepository, S: UserChallengeRep
         return Ok((StatusCode::OK, Json(quest_ids)));
     }
 
-    return Err(StatusCode::UNAUTHORIZED);
+    return Ok((StatusCode::OK, Json(Vec::new())));
 }
