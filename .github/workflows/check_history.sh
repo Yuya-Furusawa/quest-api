@@ -5,6 +5,8 @@ set -e
 ## base branchに対して、fast-forward merge可能かどうかをチェックする
 ####################
 
+git fetch origin $GITHUB_BASE_REF
+
 # BASE_COMMITを取得する
 MERGE_BASE_COMMIT=$(git merge-base $GITHUB_BASE_REF HEAD)
 
