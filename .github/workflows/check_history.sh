@@ -30,6 +30,6 @@ MERGE_COMMITS=$(git rev-list --merges $MERGE_BASE_COMMIT..HEAD)
 if [ -z "$MERGE_COMMITS" ]; then
   echo "Merge commits not found."
 else
-  echo "Merge commits found."
+  echo "Merge commits found. : ${MERGE_COMMITS}"
   exit 1
 fi
