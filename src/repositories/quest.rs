@@ -2,7 +2,7 @@ use anyhow::Ok;
 use axum::async_trait;
 use nanoid::nanoid;
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, PgPool, Type};
+use sqlx::{FromRow, PgPool};
 
 use super::challenge::Challenge;
 
@@ -38,29 +38,17 @@ impl QuestRepository for QuestRepositoryForDb {
     async fn create(&self, payload: CreateQuest) -> anyhow::Result<QuestEntity> {
         let row = sqlx::query_as::<_, QuestFromRow>(
             r#"
-                insert into quests values ($1, $2, $3, $4, $5, $6, $7)
+                insert into quests values ($1, $2, $3)
                 returning *
             "#,
         )
         .bind(nanoid!())
         .bind(payload.title)
         .bind(payload.description)
-        .bind(payload.price)
-        .bind(payload.difficulty.to_string())
-        .bind(payload.num_participate)
-        .bind(payload.num_clear)
         .fetch_one(&self.pool)
         .await?;
 
-        let quest = QuestEntity::new(
-            row.id,
-            row.title,
-            row.description,
-            row.price,
-            row.difficulty,
-            row.num_participate,
-            row.num_clear,
-        );
+        let quest = QuestEntity::new(row.id, row.title, row.description);
 
         Ok(quest)
     }
@@ -88,10 +76,6 @@ impl QuestRepository for QuestRepositoryForDb {
             id: row.id,
             title: row.title,
             description: row.description,
-            price: row.price,
-            difficulty: row.difficulty,
-            num_participate: row.num_participate,
-            num_clear: row.num_clear,
             challenges,
         };
 
@@ -117,17 +101,7 @@ impl QuestRepository for QuestRepositoryForDb {
 
         let mut quests = quest_rows
             .into_iter()
-            .map(|row| {
-                QuestEntity::new(
-                    row.id,
-                    row.title,
-                    row.description,
-                    row.price,
-                    row.difficulty,
-                    row.num_participate,
-                    row.num_clear,
-                )
-            })
+            .map(|row| QuestEntity::new(row.id, row.title, row.description))
             .collect::<Vec<QuestEntity>>();
 
         for challenge in challenge_rows {
@@ -143,17 +117,12 @@ impl QuestRepository for QuestRepositoryForDb {
         let old_quest = self.find(id.clone()).await?;
         let row = sqlx::query_as::<_, QuestFromRow>(
             r#"
-                update quests set title=$1, description=$2, price=$3, difficulty=$4, num_participate=$5, num_clear=$6
-                where id=$7
+                update quests set title=$1, description=$2 where id=$3
                 returning *
             "#,
         )
         .bind(payload.title.unwrap_or(old_quest.title))
         .bind(payload.description.unwrap_or(old_quest.description))
-        .bind(payload.price.unwrap_or(old_quest.price))
-        .bind((payload.difficulty.unwrap_or(old_quest.difficulty)).to_string())
-        .bind(payload.num_participate.unwrap_or(old_quest.num_participate))
-        .bind(payload.num_clear.unwrap_or(old_quest.num_clear))
         .bind(id)
         .fetch_one(&self.pool)
         .await?;
@@ -162,10 +131,6 @@ impl QuestRepository for QuestRepositoryForDb {
             id: row.id,
             title: row.title,
             description: row.description,
-            price: row.price,
-            difficulty: row.difficulty,
-            num_participate: row.num_participate,
-            num_clear: row.num_clear,
             challenges: old_quest.challenges,
         };
 
@@ -195,48 +160,11 @@ impl QuestRepository for QuestRepositoryForDb {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
-pub enum Difficulty {
-    Easy,
-    Normal,
-    Hard,
-}
-
-impl std::fmt::Display for Difficulty {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl TryFrom<String> for Difficulty {
-    type Error = &'static str;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        let from_row: &str = &value;
-
-        const EASY: &str = "Easy";
-        const NORMAL: &str = "Normal";
-        const HARD: &str = "Hard";
-
-        match from_row {
-            EASY => core::result::Result::Ok(Difficulty::Easy),
-            NORMAL => core::result::Result::Ok(Difficulty::Normal),
-            HARD => core::result::Result::Ok(Difficulty::Hard),
-            _ => Err("Wrong Column Name"),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct QuestFromRow {
     pub id: String,
     pub title: String,
     pub description: String,
-    pub price: i32, // 0ならFree
-    #[sqlx(try_from = "String")]
-    pub difficulty: Difficulty,
-    pub num_participate: i32,
-    pub num_clear: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -244,32 +172,15 @@ pub struct QuestEntity {
     pub id: String,
     pub title: String,
     pub description: String,
-    pub price: i32, // 0ならFree
-    #[sqlx(try_from = "String")]
-    pub difficulty: Difficulty,
-    pub num_participate: i32,
-    pub num_clear: i32,
     pub challenges: Vec<Challenge>,
 }
 
 impl QuestEntity {
-    pub fn new(
-        id: String,
-        title: String,
-        description: String,
-        price: i32,
-        difficulty: Difficulty,
-        num_participate: i32,
-        num_clear: i32,
-    ) -> Self {
+    pub fn new(id: String, title: String, description: String) -> Self {
         Self {
             id,
             title,
             description,
-            price,
-            difficulty,
-            num_participate,
-            num_clear,
             challenges: Vec::new(),
         }
     }
@@ -278,12 +189,7 @@ impl QuestEntity {
 // 各fieldが一致したとき==とみなす
 impl PartialEq for QuestEntity {
     fn eq(&self, other: &QuestEntity) -> bool {
-        (self.title == other.title)
-            && (self.description == other.description)
-            && (self.price == other.price)
-            && (self.difficulty == other.difficulty)
-            && (self.num_participate == other.num_participate)
-            && (self.num_clear == other.num_clear)
+        (self.title == other.title) && (self.description == other.description)
     }
 }
 
@@ -291,30 +197,12 @@ impl PartialEq for QuestEntity {
 pub struct CreateQuest {
     title: String,
     description: String,
-    price: i32, // 0ならFree
-    difficulty: Difficulty,
-    num_participate: i32,
-    num_clear: i32,
 }
 
 #[cfg(test)]
 impl CreateQuest {
-    pub fn new(
-        title: String,
-        description: String,
-        price: i32,
-        difficulty: Difficulty,
-        num_participate: i32,
-        num_clear: i32,
-    ) -> Self {
-        Self {
-            title,
-            description,
-            price,
-            difficulty,
-            num_participate,
-            num_clear,
-        }
+    pub fn new(title: String, description: String) -> Self {
+        Self { title, description }
     }
 }
 
@@ -322,8 +210,4 @@ impl CreateQuest {
 pub struct UpdateQuest {
     title: Option<String>,
     description: Option<String>,
-    price: Option<i32>,
-    difficulty: Option<Difficulty>,
-    num_participate: Option<i32>,
-    num_clear: Option<i32>,
 }
