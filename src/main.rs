@@ -1,10 +1,12 @@
 mod handlers;
 mod infras;
+mod middleware;
 mod repositories;
 mod services;
 
 use axum::{
     extract::Extension,
+    middleware::from_fn,
     routing::{get, post},
     Router,
 };
@@ -22,6 +24,7 @@ use crate::handlers::{
     user_challenge::{complete_challenge, get_completed_challenges},
     user_quest::{get_participated_quests, participate_quest},
 };
+use crate::middleware::auth::auth_middleware;
 use crate::repositories::{
     challenge::{ChallengeRepository, ChallengeRepositoryForDb},
     quest::{QuestRepository, QuestRepositoryForDb},
@@ -168,7 +171,6 @@ fn create_challenge_routes<T: ChallengeRepository, S: UserChallengeRepository>(
 pub struct UserInfoHandlerState<T: UserQuestRepository, S: UserChallengeRepository> {
     userquest_repository: Arc<T>,
     userchallenge_repository: Arc<S>,
-    secret_key: String,
 }
 
 fn create_user_info_routes<T: UserQuestRepository, S: UserChallengeRepository>(
@@ -179,7 +181,6 @@ fn create_user_info_routes<T: UserQuestRepository, S: UserChallengeRepository>(
     let user_info_state = UserInfoHandlerState {
         userquest_repository: Arc::new(userquest_repository),
         userchallenge_repository: Arc::new(userchallenge_repository),
-        secret_key,
     };
 
     Router::new()
@@ -192,6 +193,9 @@ fn create_user_info_routes<T: UserQuestRepository, S: UserChallengeRepository>(
             get(get_completed_challenges::<T, S>),
         )
         .layer(Extension(user_info_state))
+        .layer(from_fn(move |req, next| {
+            auth_middleware(secret_key.clone(), req, next)
+        }))
 }
 
 async fn root() -> &'static str {
