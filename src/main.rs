@@ -217,7 +217,6 @@ mod test {
         challenge::{Challenge, CreateChallenge},
         quest::{CreateQuest, QuestEntity},
         user::{RegisterUser, UserEntity},
-        services::user::create_jwt,
     };
     use crate::services::user::create_jwt;
 
