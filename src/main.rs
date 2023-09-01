@@ -217,8 +217,8 @@ mod test {
         challenge::{Challenge, CreateChallenge},
         quest::{CreateQuest, QuestEntity},
         user::{RegisterUser, UserEntity},
-        services::user::create_jwt,
     };
+    use crate::services::user::create_jwt;
 
     const DB_URL_FOR_TEST: &str = "postgres://admin:admin@localhost:5432/quests";
 
