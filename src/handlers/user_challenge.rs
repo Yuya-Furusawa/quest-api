@@ -46,5 +46,5 @@ pub async fn get_completed_challenges<T: UserQuestRepository, S: UserChallengeRe
         return Ok((StatusCode::OK, Json(quest_ids)));
     }
 
-    return Ok((StatusCode::OK, Json(Vec::new())));
+    Err(StatusCode::UNAUTHORIZED)
 }
