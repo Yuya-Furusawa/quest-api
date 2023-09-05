@@ -32,19 +32,19 @@ pub async fn get_completed_challenges<T: UserQuestRepository, S: UserChallengeRe
     TypedHeader(cookie): TypedHeader<axum::headers::Cookie>,
     Extension(state): Extension<UserInfoHandlerState<T, S>>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    if let Some(cookie_token) = cookie.get("session_token") {
-        let secret_key = &state.secret_key;
+    let cookie_token = match cookie.get("session_token") {
+        None => return Err(StatusCode::UNAUTHORIZED),
+        Some(token) => token,
+    };
 
-        let decoded_token = decode_jwt(cookie_token, &secret_key).unwrap();
+    let secret_key = &state.secret_key;
+    let decoded_token = decode_jwt(cookie_token, &secret_key).unwrap();
 
-        let quest_ids = state
-            .userchallenge_repository
-            .get_completed_challenges_by_user_id(decoded_token.claims.user_id)
-            .await
-            .or(Err(StatusCode::NOT_FOUND))?;
+    let quest_ids = state
+        .userchallenge_repository
+        .get_completed_challenges_by_user_id(decoded_token.claims.user_id)
+        .await
+        .or(Err(StatusCode::NOT_FOUND))?;
 
-        return Ok((StatusCode::OK, Json(quest_ids)));
-    }
-
-    Err(StatusCode::UNAUTHORIZED)
+    Ok((StatusCode::OK, Json(quest_ids)))
 }
