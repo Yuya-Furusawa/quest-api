@@ -1,5 +1,5 @@
 include .env
-.PHONY: up migrate
+.PHONY: up migrate seed
 
 build:
 	docker-compose -f docker-compose.yml -f docker-compose.dev.yml build
@@ -9,10 +9,12 @@ up:
 
 migrate:
 	docker-compose exec api sqlx migrate run --ignore-missing
+
+seed:
 	docker cp ./seeds/seed.sql quest-api_database_1:/tmp/
 	docker exec quest-api_database_1 psql -U $(DATABASE_USER) -d $(DATABASE_DB) -q -f /tmp/seed.sql
 
-start: up migrate
+start: up migrate seed
 
 # ボリュームも合わせて削除する
 down:
