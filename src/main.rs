@@ -19,8 +19,8 @@ use crate::handlers::{
     challenge::{create_challenge, find_challenge, find_challenge_by_quest_id},
     quest::{all_quests, create_quest, delete_quest, find_quest, update_quest},
     user::{auth_user, delete_user, find_user, login_user, register_user},
-    user_challenge::complete_challenge,
-    user_quest::participate_quest,
+    user_challenge::{complete_challenge, get_completed_challenges},
+    user_quest::{get_participated_quests, participate_quest},
 };
 use crate::repositories::{
     challenge::{ChallengeRepository, ChallengeRepositoryForDb},
@@ -80,9 +80,15 @@ fn create_app<
     userchallenge_repository: Q,
     secret_key: String,
 ) -> Router {
-    let user_routes = create_user_routes(user_repository, secret_key);
-    let quest_routes = create_quest_routes(quest_repository, userquest_repository);
-    let challenge_routes = create_challenge_routes(challenge_repository, userchallenge_repository);
+    let user_routes = create_user_routes(user_repository, secret_key.clone());
+    let quest_routes = create_quest_routes(quest_repository, userquest_repository.clone());
+    let challenge_routes =
+        create_challenge_routes(challenge_repository, userchallenge_repository.clone());
+    let user_info_routes = create_user_info_routes(
+        userquest_repository.clone(),
+        userchallenge_repository.clone(),
+        secret_key,
+    );
 
     let origins = [
         "http://localhost:5173".parse::<HeaderValue>().unwrap(),
@@ -96,6 +102,7 @@ fn create_app<
         .nest("/", user_routes)
         .nest("/", quest_routes)
         .nest("/", challenge_routes)
+        .nest("/", user_info_routes)
         .layer(
             CorsLayer::new()
                 .allow_origin(origins)
@@ -157,6 +164,36 @@ fn create_challenge_routes<T: ChallengeRepository, S: UserChallengeRepository>(
         .layer(Extension(Arc::new(userchallenge_repository)))
 }
 
+#[derive(Clone)]
+pub struct UserInfoHandlerState<T: UserQuestRepository, S: UserChallengeRepository> {
+    userquest_repository: Arc<T>,
+    userchallenge_repository: Arc<S>,
+    secret_key: String,
+}
+
+fn create_user_info_routes<T: UserQuestRepository, S: UserChallengeRepository>(
+    userquest_repository: T,
+    userchallenge_repository: S,
+    secret_key: String,
+) -> Router {
+    let user_info_state = UserInfoHandlerState {
+        userquest_repository: Arc::new(userquest_repository),
+        userchallenge_repository: Arc::new(userchallenge_repository),
+        secret_key,
+    };
+
+    Router::new()
+        .route(
+            "/me/participated_quests",
+            get(get_participated_quests::<T, S>),
+        )
+        .route(
+            "/me/completed_challenges",
+            get(get_completed_challenges::<T, S>),
+        )
+        .layer(Extension(user_info_state))
+}
+
 async fn root() -> &'static str {
     "Hello World!"
 }
@@ -170,6 +207,7 @@ mod test {
         http::{header, Method, Request},
         response::Response,
     };
+    use chrono::{Duration, Utc};
     use http::{header::SET_COOKIE, HeaderMap};
     use hyper::{self, StatusCode};
     use nanoid::nanoid;
@@ -180,6 +218,7 @@ mod test {
         quest::{CreateQuest, QuestEntity},
         user::{RegisterUser, UserEntity},
     };
+    use crate::services::user::create_jwt;
 
     const DB_URL_FOR_TEST: &str = "postgres://admin:admin@localhost:5432/quests";
 
@@ -197,6 +236,15 @@ mod test {
             .method(method)
             .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
             .body(Body::from(json_body))
+            .unwrap()
+    }
+
+    fn build_req_with_cookie(path: &str, method: Method, cookie: &str) -> Request<Body> {
+        Request::builder()
+            .uri(path)
+            .method(method)
+            .header("Cookie", cookie)
+            .body(Body::empty())
             .unwrap()
     }
 
@@ -586,6 +634,105 @@ mod test {
     }
 
     #[tokio::test]
+    async fn should_get_participated_quests() {
+        // ユーザーの作成
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
+            .await
+            .unwrap();
+        let test_user = user_repository
+            .register(RegisterUser::new(
+                "test_user".to_string(),
+                "test_email".to_string(),
+                "test_password".to_string(),
+            ))
+            .await
+            .unwrap();
+
+        // クエストの作成
+        let quest_repository = QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let test_quest = quest_repository
+            .create(CreateQuest::new(
+                "Test Quest".to_string(),
+                "This is a test quest.".to_string(),
+            ))
+            .await
+            .unwrap();
+
+        // クエスト参加を保存する
+        let userquest_repository = UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let _ = userquest_repository
+            .save_quest_participate_event(test_user.id.clone(), test_quest.id.clone())
+            .await;
+
+        // 認証のためにトークン作成
+        let now = Utc::now();
+        let iat = now.timestamp();
+        let exp = (now + Duration::hours(8)).timestamp();
+        let secret_key = "secret-key".to_string();
+        let token = create_jwt(&test_user.id.clone(), iat, &exp, &secret_key);
+        let cookie_header = format!("session_token={}", token);
+
+        // テスト対象
+        let userchallenge_repository =
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let req = build_req_with_cookie("/me/participated_quests", Method::GET, &cookie_header);
+        let res =
+            create_user_info_routes(userquest_repository, userchallenge_repository, secret_key)
+                .oneshot(req)
+                .await
+                .unwrap();
+        let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
+        let body: String = String::from_utf8(bytes.to_vec()).unwrap();
+        let quest_ids: Vec<String> = serde_json::from_str(&body).expect(&format!(
+            "cannot convert Vec<String> instance. body {}",
+            body
+        ));
+        assert_eq!(vec![test_quest.id.clone()], quest_ids);
+    }
+
+    #[tokio::test]
+    async fn should_return_empty_vec_when_zero_patricipated_quest() {
+        // ユーザーの作成
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
+            .await
+            .unwrap();
+        let test_user = user_repository
+            .register(RegisterUser::new(
+                "test_user".to_string(),
+                "test_email".to_string(),
+                "test_password".to_string(),
+            ))
+            .await
+            .unwrap();
+
+        // 認証のためにトークン作成
+        let now = Utc::now();
+        let iat = now.timestamp();
+        let exp = (now + Duration::hours(8)).timestamp();
+        let secret_key = "secret-key".to_string();
+        let token = create_jwt(&test_user.id.clone(), iat, &exp, &secret_key);
+        let cookie_header = format!("session_token={}", token);
+
+        // テスト対象
+        let userquest_repository = UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let userchallenge_repository =
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let req = build_req_with_cookie("/me/participated_quests", Method::GET, &cookie_header);
+        let res =
+            create_user_info_routes(userquest_repository, userchallenge_repository, secret_key)
+                .oneshot(req)
+                .await
+                .unwrap();
+        let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
+        let body: String = String::from_utf8(bytes.to_vec()).unwrap();
+        let quest_ids: Vec<String> = serde_json::from_str(&body).expect(&format!(
+            "cannot convert Vec<String> instance. body {}",
+            body
+        ));
+        assert_eq!(Vec::<String>::new(), quest_ids);
+    }
+
+    #[tokio::test]
     async fn should_create_challenge() {
         let expected = Challenge::new(
             nanoid!(),
@@ -752,5 +899,111 @@ mod test {
             .unwrap();
 
         assert_eq!(result, vec![test_challenge.id])
+    }
+
+    #[tokio::test]
+    async fn should_get_completed_challenges() {
+        // ユーザーの作成
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
+            .await
+            .unwrap();
+        let test_user = user_repository
+            .register(RegisterUser::new(
+                "test_user".to_string(),
+                "test_email".to_string(),
+                "test_password".to_string(),
+            ))
+            .await
+            .unwrap();
+
+        // チャレンジの作成
+        let challenge_repository = ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let test_challenge = challenge_repository
+            .create(CreateChallenge::new(
+                "Test Challenge".to_string(),
+                "This is a test challenge".to_string(),
+                "test_id".to_string(),
+                35.6895,
+                139.6917,
+                "Test Stamp".to_string(),
+                "test-stamp-image-color".to_string(),
+                "test-stamp-image-gray".to_string(),
+                "This is a test stamp".to_string(),
+            ))
+            .await
+            .unwrap();
+
+        // クエスト参加を保存する
+        let userchallenge_repository =
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let _ = userchallenge_repository
+            .save_challenge_complete_event(test_user.id.clone(), test_challenge.id.clone())
+            .await;
+
+        // 認証のためにトークン作成
+        let now = Utc::now();
+        let iat = now.timestamp();
+        let exp = (now + Duration::hours(8)).timestamp();
+        let secret_key = "secret-key".to_string();
+        let token = create_jwt(&test_user.id.clone(), iat, &exp, &secret_key);
+        let cookie_header = format!("session_token={}", token);
+
+        // テスト対象
+        let userquest_repository = UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let req = build_req_with_cookie("/me/completed_challenges", Method::GET, &cookie_header);
+        let res =
+            create_user_info_routes(userquest_repository, userchallenge_repository, secret_key)
+                .oneshot(req)
+                .await
+                .unwrap();
+        let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
+        let body: String = String::from_utf8(bytes.to_vec()).unwrap();
+        let challenge_ids: Vec<String> = serde_json::from_str(&body).expect(&format!(
+            "cannot convert Vec<String> instance. body {}",
+            body
+        ));
+        assert_eq!(vec![test_challenge.id.clone()], challenge_ids);
+    }
+
+    #[tokio::test]
+    async fn should_return_empty_vec_when_zero_completed_challenge() {
+        // ユーザーの作成
+        let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
+            .await
+            .unwrap();
+        let test_user = user_repository
+            .register(RegisterUser::new(
+                "test_user".to_string(),
+                "test_email".to_string(),
+                "test_password".to_string(),
+            ))
+            .await
+            .unwrap();
+
+        // 認証のためにトークン作成
+        let now = Utc::now();
+        let iat = now.timestamp();
+        let exp = (now + Duration::hours(8)).timestamp();
+        let secret_key = "secret-key".to_string();
+        let token = create_jwt(&test_user.id.clone(), iat, &exp, &secret_key);
+        let cookie_header = format!("session_token={}", token);
+
+        // テスト対象
+        let userquest_repository = UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let userchallenge_repository =
+            UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
+        let req = build_req_with_cookie("/me/completed_challenges", Method::GET, &cookie_header);
+        let res =
+            create_user_info_routes(userquest_repository, userchallenge_repository, secret_key)
+                .oneshot(req)
+                .await
+                .unwrap();
+        let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
+        let body: String = String::from_utf8(bytes.to_vec()).unwrap();
+        let quest_ids: Vec<String> = serde_json::from_str(&body).expect(&format!(
+            "cannot convert Vec<String> instance. body {}",
+            body
+        ));
+        assert_eq!(Vec::<String>::new(), quest_ids);
     }
 }

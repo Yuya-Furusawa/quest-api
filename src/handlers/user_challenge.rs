@@ -2,11 +2,18 @@ use axum::{
     extract::{Extension, Path},
     http::StatusCode,
     response::IntoResponse,
-    Json,
+    Json, TypedHeader,
 };
 use std::sync::Arc;
 
-use crate::repositories::user_challenge::{CompleteChallengePayload, UserChallengeRepository};
+use crate::{
+    repositories::{
+        user_challenge::{CompleteChallengePayload, UserChallengeRepository},
+        user_quest::UserQuestRepository,
+    },
+    services::user::decode_jwt,
+    UserInfoHandlerState,
+};
 
 pub async fn complete_challenge<T: UserChallengeRepository>(
     Path(challenge_id): Path<String>,
@@ -19,4 +26,25 @@ pub async fn complete_challenge<T: UserChallengeRepository>(
         .or(Err(StatusCode::BAD_REQUEST))?;
 
     Ok(StatusCode::CREATED)
+}
+
+pub async fn get_completed_challenges<T: UserQuestRepository, S: UserChallengeRepository>(
+    TypedHeader(cookie): TypedHeader<axum::headers::Cookie>,
+    Extension(state): Extension<UserInfoHandlerState<T, S>>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let cookie_token = match cookie.get("session_token") {
+        None => return Err(StatusCode::UNAUTHORIZED),
+        Some(token) => token,
+    };
+
+    let secret_key = &state.secret_key;
+    let decoded_token = decode_jwt(cookie_token, &secret_key).unwrap();
+
+    let quest_ids = state
+        .userchallenge_repository
+        .get_completed_challenges_by_user_id(decoded_token.claims.user_id)
+        .await
+        .or(Err(StatusCode::NOT_FOUND))?;
+
+    Ok((StatusCode::OK, Json(quest_ids)))
 }
