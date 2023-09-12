@@ -177,7 +177,7 @@ mod test {
 
     use crate::repositories::{
         challenge::{Challenge, CreateChallenge},
-        quest::{CreateQuest, Difficulty, QuestEntity},
+        quest::{CreateQuest, QuestEntity},
         user::{RegisterUser, UserEntity},
     };
 
@@ -260,10 +260,6 @@ mod test {
             nanoid!(),
             "Test Create Quest".to_string(),
             "This is a test of creating a quest.".to_string(),
-            0,
-            Difficulty::Normal,
-            12345,
-            123,
         );
 
         let req = build_req_with_json(
@@ -271,11 +267,7 @@ mod test {
             Method::POST,
             r#"{
                 "title": "Test Create Quest",
-                "description": "This is a test of creating a quest.",
-                "price": 0,
-                "difficulty": "Normal",
-                "num_participate": 12345,
-                "num_clear": 123
+                "description": "This is a test of creating a quest."
              }"#
             .to_string(),
         );
@@ -299,20 +291,12 @@ mod test {
             nanoid!(),
             "Test Find Quest".to_string(),
             "This is a test of finding a quest.".to_string(),
-            0,
-            Difficulty::Normal,
-            12345,
-            123,
         );
 
         let created_quest = quest_repository
             .create(CreateQuest::new(
                 "Test Find Quest".to_string(),
                 "This is a test of finding a quest.".to_string(),
-                0,
-                Difficulty::Normal,
-                12345,
-                123,
             ))
             .await
             .expect("failed to create quest");
@@ -338,19 +322,11 @@ mod test {
             nanoid!(),
             "Test All Quests".to_string(),
             "This is a test of finding all quests.".to_string(),
-            0,
-            Difficulty::Normal,
-            12345,
-            123,
         );
         quest_repository
             .create(CreateQuest::new(
                 "Test All Quests".to_string(),
                 "This is a test of finding all quests.".to_string(),
-                0,
-                Difficulty::Normal,
-                12345,
-                123,
             ))
             .await
             .expect("failed to create quest");
@@ -377,19 +353,11 @@ mod test {
             nanoid!(),
             "Test Update Quests".to_string(),
             "This is a test of updating a quest.".to_string(),
-            0,
-            Difficulty::Normal,
-            12345,
-            123,
         );
         let created_quest = quest_repository
             .create(CreateQuest::new(
                 "Test Update Quests Before".to_string(),
                 "This is a dummy quest before updating.".to_string(),
-                0,
-                Difficulty::Normal,
-                12345,
-                123,
             ))
             .await
             .expect("failed to create quest");
@@ -423,10 +391,6 @@ mod test {
             .create(CreateQuest::new(
                 "Test Delete Quests".to_string(),
                 "This is a test of deleting a quest.".to_string(),
-                0,
-                Difficulty::Normal,
-                12345,
-                123,
             ))
             .await
             .expect("failed to create quest");
@@ -590,10 +554,6 @@ mod test {
             .create(CreateQuest::new(
                 "Test Quest".to_string(),
                 "This is a test quest.".to_string(),
-                0,
-                Difficulty::Normal,
-                12345,
-                123,
             ))
             .await
             .unwrap();

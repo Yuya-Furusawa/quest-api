@@ -5,11 +5,6 @@ use nanoid::nanoid;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
 
-use crate::repositories::{
-    challenge::Challenge,
-    quest::{Difficulty, QuestFromRow},
-};
-
 #[async_trait]
 pub trait UserRepository: Clone + std::marker::Send + std::marker::Sync + 'static {
     async fn register(&self, payload: RegisterUser) -> anyhow::Result<UserEntity>;
@@ -73,54 +68,10 @@ impl UserRepository for UserRepositoryForDb {
             return Err(anyhow!("Invalid Password"));
         }
 
-        let user_quest = sqlx::query_as::<_, UserWithQuestFromRow>(
-            r#"
-                select user_participating_quests.*, quests.title as title, quests.description as description, quests.price as price, quests.difficulty as difficulty, quests.num_participate as num_participate, quests.num_clear as num_clear from user_participating_quests
-                    left outer join quests on user_participating_quests.quest_id = quests.id
-                    where user_id=$1;
-            "#
-        )
-        .bind(user_row.id.clone())
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|_| Vec::<UserWithQuestFromRow>::new())
-        .unwrap();
-
-        let quests = user_quest
-            .iter()
-            .map(|x| QuestFromRow {
-                id: x.quest_id.clone(),
-                title: x.title.clone(),
-                description: x.description.clone(),
-                price: x.price.clone(),
-                difficulty: x.difficulty.clone(),
-                num_participate: x.num_participate.clone(),
-                num_clear: x.num_clear.clone(),
-            })
-            .collect::<Vec<QuestFromRow>>();
-
-        let user_challenge = sqlx::query_as::<_, UserChallengeFromRow>(
-            r#"
-                select * from user_completed_challenges where user_id=$1
-            "#,
-        )
-        .bind(user_row.id.clone())
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|_| Vec::<Challenge>::new())
-        .unwrap();
-
-        let challenges = user_challenge
-            .iter()
-            .map(|x| x.challenge_id.clone())
-            .collect::<Vec<String>>();
-
         let user = UserEntity {
             id: user_row.id.clone(),
             username: user_row.username.clone(),
             email: user_row.email.clone(),
-            participate_quest: quests,
-            complete_challenge: challenges,
         };
 
         anyhow::Ok(user)
@@ -136,54 +87,10 @@ impl UserRepository for UserRepositoryForDb {
         .fetch_one(&self.pool)
         .await?;
 
-        let user_quest = sqlx::query_as::<_, UserWithQuestFromRow>(
-            r#"
-                select user_participating_quests.*, quests.title as title, quests.description as description, quests.price as price, quests.difficulty as difficulty, quests.num_participate as num_participate, quests.num_clear as num_clear from user_participating_quests
-                    left outer join quests on user_participating_quests.quest_id = quests.id
-                    where user_id=$1;
-            "#
-        )
-        .bind(id.clone())
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|_| Vec::<UserWithQuestFromRow>::new())
-        .unwrap();
-
-        let quests = user_quest
-            .iter()
-            .map(|x| QuestFromRow {
-                id: x.quest_id.clone(),
-                title: x.title.clone(),
-                description: x.description.clone(),
-                price: x.price.clone(),
-                difficulty: x.difficulty.clone(),
-                num_participate: x.num_participate.clone(),
-                num_clear: x.num_clear.clone(),
-            })
-            .collect::<Vec<QuestFromRow>>();
-
-        let user_challenge = sqlx::query_as::<_, UserChallengeFromRow>(
-            r#"
-                select * from user_completed_challenges where user_id=$1
-            "#,
-        )
-        .bind(id.clone())
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|_| Vec::<UserChallengeFromRow>::new())
-        .unwrap();
-
-        let challenges = user_challenge
-            .iter()
-            .map(|x| x.challenge_id.clone())
-            .collect::<Vec<String>>();
-
         let user = UserEntity {
             id: user_row.id.clone(),
             username: user_row.username.clone(),
             email: user_row.email.clone(),
-            participate_quest: quests,
-            complete_challenge: challenges,
         };
 
         anyhow::Ok(user)
@@ -236,34 +143,11 @@ struct UserFromRow {
     password: String,
 }
 
-#[allow(dead_code)]
-#[derive(Debug, Clone, FromRow)]
-struct UserWithQuestFromRow {
-    user_id: String,
-    quest_id: String,
-    title: String,
-    description: String,
-    price: i32, // 0ならFree
-    #[sqlx(try_from = "String")]
-    difficulty: Difficulty,
-    num_participate: i32,
-    num_clear: i32,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, FromRow)]
-struct UserChallengeFromRow {
-    user_id: String,
-    challenge_id: String,
-}
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct UserEntity {
     pub id: String,
     pub username: String,
     pub email: String,
-    pub participate_quest: Vec<QuestFromRow>,
-    pub complete_challenge: Vec<String>, // 達成したChallengeはidだけ持つ
 }
 
 impl UserEntity {
@@ -272,8 +156,6 @@ impl UserEntity {
             id,
             username,
             email,
-            participate_quest: Vec::new(),
-            complete_challenge: Vec::new(),
         }
     }
 }
