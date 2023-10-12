@@ -84,7 +84,11 @@ fn create_app<
     secret_key: String,
 ) -> Router {
     let user_routes = create_user_routes(user_repository, secret_key.clone());
-    let quest_routes = create_quest_routes(quest_repository, userquest_repository.clone());
+    let quest_routes = create_quest_routes(
+        quest_repository,
+        userquest_repository.clone(),
+        secret_key.clone(),
+    );
     let challenge_routes =
         create_challenge_routes(challenge_repository, userchallenge_repository.clone());
     let user_info_routes = create_user_info_routes(
@@ -146,16 +150,26 @@ fn create_user_routes<T: UserRepository>(user_repository: T, secret_key: String)
 fn create_quest_routes<T: QuestRepository, S: UserQuestRepository>(
     quest_repository: T,
     userquest_repository: S,
+    secret_key: String,
 ) -> Router {
-    Router::new()
+    let auth_routes = Router::new()
+        .route("/quests/:id/participate", post(participate_quest::<S>))
+        .layer(from_fn(move |req, next| {
+            auth_middleware(secret_key.clone(), req, next)
+        }));
+
+    let non_auth_routes = Router::new()
         .route("/quests", post(create_quest::<T>).get(all_quests::<T>))
         .route(
             "/quests/:id",
             get(find_quest::<T>)
                 .patch(update_quest::<T>)
                 .delete(delete_quest::<T>),
-        )
-        .route("/quests/:id/participate", post(participate_quest::<S>))
+        );
+
+    Router::new()
+        .merge(auth_routes)
+        .merge(non_auth_routes)
         .layer(Extension(Arc::new(quest_repository)))
         .layer(Extension(Arc::new(userquest_repository)))
 }
@@ -334,6 +348,7 @@ mod test {
         let res = create_quest_routes(
             QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
             UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
@@ -366,6 +381,7 @@ mod test {
         let res = create_quest_routes(
             quest_repository,
             UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
@@ -395,6 +411,7 @@ mod test {
         let res = create_quest_routes(
             quest_repository.clone(),
             UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
@@ -435,6 +452,7 @@ mod test {
         let res = create_quest_routes(
             quest_repository,
             UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
@@ -460,6 +478,7 @@ mod test {
         let res = create_quest_routes(
             quest_repository,
             UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
@@ -632,6 +651,7 @@ mod test {
         create_quest_routes(
             QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
             repository.clone(),
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
