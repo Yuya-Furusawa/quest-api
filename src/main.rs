@@ -89,8 +89,11 @@ fn create_app<
         userquest_repository.clone(),
         secret_key.clone(),
     );
-    let challenge_routes =
-        create_challenge_routes(challenge_repository, userchallenge_repository.clone());
+    let challenge_routes = create_challenge_routes(
+        challenge_repository,
+        userchallenge_repository.clone(),
+        secret_key.clone(),
+    );
     let user_info_routes = create_user_info_routes(
         userquest_repository.clone(),
         userchallenge_repository.clone(),
@@ -177,14 +180,24 @@ fn create_quest_routes<T: QuestRepository, S: UserQuestRepository>(
 fn create_challenge_routes<T: ChallengeRepository, S: UserChallengeRepository>(
     challenge_repository: T,
     userchallenge_repository: S,
+    secret_key: String,
 ) -> Router {
-    Router::new()
+    let auth_routes = Router::new()
+        .route("/challenges/:id/complete", post(complete_challenge::<S>))
+        .layer(from_fn(move |req, next| {
+            auth_middleware(secret_key.clone(), req, next)
+        }));
+
+    let non_auth_routes = Router::new()
         .route(
             "/challenges",
             post(create_challenge::<T>).get(find_challenge_by_quest_id::<T>),
         )
-        .route("/challenges/:id", get(find_challenge::<T>))
-        .route("/challenges/:id/complete", post(complete_challenge::<S>))
+        .route("/challenges/:id", get(find_challenge::<T>));
+
+    Router::new()
+        .merge(auth_routes)
+        .merge(non_auth_routes)
         .layer(Extension(Arc::new(challenge_repository)))
         .layer(Extension(Arc::new(userchallenge_repository)))
 }
@@ -799,6 +812,7 @@ mod test {
         let res = create_challenge_routes(
             ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
             UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
@@ -832,6 +846,7 @@ mod test {
         let res = create_challenge_routes(
             challenge_repository,
             UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
@@ -864,6 +879,7 @@ mod test {
         let res = create_challenge_routes(
             challenge_repository,
             UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
@@ -920,6 +936,7 @@ mod test {
         create_challenge_routes(
             ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
             repository.clone(),
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
