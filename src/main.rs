@@ -124,15 +124,23 @@ pub struct UserHandlerState<T: UserRepository> {
 fn create_user_routes<T: UserRepository>(user_repository: T, secret_key: String) -> Router {
     let user_state = UserHandlerState {
         user_repository: Arc::new(user_repository),
-        secret_key,
+        secret_key: secret_key.clone(),
     };
 
-    Router::new()
-        .route("/register", post(register_user::<T>))
-        .route("/login", post(login_user::<T>))
+    let auth_routes = Router::new()
         .route("/users/:id", get(find_user::<T>).delete(delete_user::<T>))
         .route("/user/auth", get(auth_user::<T>))
-        .layer(Extension(user_state))
+        .layer(Extension(user_state.clone()))
+        .layer(from_fn(move |req, next| {
+            auth_middleware(secret_key.clone(), req, next)
+        }));
+
+    let non_auth_routes = Router::new()
+        .route("/register", post(register_user::<T>))
+        .route("/login", post(login_user::<T>))
+        .layer(Extension(user_state));
+
+    Router::new().merge(auth_routes).merge(non_auth_routes)
 }
 
 fn create_quest_routes<T: QuestRepository, S: UserQuestRepository>(
