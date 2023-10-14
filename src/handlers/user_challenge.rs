@@ -18,7 +18,12 @@ pub async fn complete_challenge<T: UserChallengeRepository>(
     Path(challenge_id): Path<String>,
     Json(payload): Json<CompleteChallengePayload>,
     Extension(repository): Extension<Arc<T>>,
+    Extension(user_id_from_token): Extension<String>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    if payload.user_id != user_id_from_token {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
     repository
         .save_challenge_complete_event(payload.user_id, challenge_id)
         .await

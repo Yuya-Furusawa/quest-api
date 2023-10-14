@@ -82,7 +82,12 @@ pub async fn login_user<T: UserRepository>(
 pub async fn find_user<T: UserRepository>(
     Path(id): Path<String>,
     Extension(state): Extension<UserHandlerState<T>>,
+    Extension(user_id_from_token): Extension<String>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    if id != user_id_from_token {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
     let user = state
         .user_repository
         .find(id)
@@ -95,7 +100,12 @@ pub async fn find_user<T: UserRepository>(
 pub async fn delete_user<T: UserRepository>(
     Path(id): Path<String>,
     Extension(state): Extension<UserHandlerState<T>>,
+    Extension(user_id_from_token): Extension<String>,
 ) -> StatusCode {
+    if id != user_id_from_token {
+        return StatusCode::FORBIDDEN;
+    }
+
     state
         .user_repository
         .delete(id)

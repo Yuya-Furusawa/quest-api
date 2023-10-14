@@ -18,7 +18,12 @@ pub async fn participate_quest<T: UserQuestRepository>(
     Path(quest_id): Path<String>,
     Json(payload): Json<ParticipateQuestPayload>,
     Extension(repository): Extension<Arc<T>>,
+    Extension(user_id_from_token): Extension<String>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    if payload.user_id != user_id_from_token {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
     repository
         .save_quest_participate_event(payload.user_id, quest_id)
         .await
