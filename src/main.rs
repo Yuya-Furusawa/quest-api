@@ -287,6 +287,21 @@ mod test {
             .unwrap()
     }
 
+    fn build_req_with_json_cookie(
+        path: &str,
+        method: Method,
+        json_body: String,
+        cookie: &str,
+    ) -> Request<Body> {
+        Request::builder()
+            .uri(path)
+            .method(method)
+            .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+            .header("Cookie", cookie)
+            .body(Body::from(json_body))
+            .unwrap()
+    }
+
     async fn res_to_quest(res: Response) -> QuestEntity {
         let bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
         let body = String::from_utf8(bytes.to_vec()).unwrap();
@@ -585,10 +600,15 @@ mod test {
             .await
             .expect("failed to create user");
 
-        let req_path = format!("{}{}", "/users/", created_user.id);
-        let req = build_req_with_empty(&req_path, Method::GET);
-
         let secret_key = "secret_key".to_string();
+        let now = Utc::now();
+        let iat = now.timestamp();
+        let exp = (now + Duration::hours(8)).timestamp();
+        let token = create_jwt(&created_user.id, iat, &exp, &secret_key);
+        let cookie_header = format!("session_token={}", token);
+
+        let req_path = format!("{}{}", "/users/", created_user.id);
+        let req = build_req_with_cookie(&req_path, Method::GET, &cookie_header);
 
         let res = create_user_routes(user_repository, secret_key)
             .oneshot(req)
@@ -604,7 +624,7 @@ mod test {
         let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
             .await
             .unwrap();
-        let creared_user = user_repository
+        let created_user = user_repository
             .register(RegisterUser::new(
                 "Test User".to_string(),
                 "test@test.com".to_string(),
@@ -613,10 +633,15 @@ mod test {
             .await
             .expect("failed to create user");
 
-        let req_path = format!("{}{}", "/users/", creared_user.id);
-        let req = build_req_with_empty(&req_path, Method::DELETE);
-
         let secret_key = "secret_key".to_string();
+        let now = Utc::now();
+        let iat = now.timestamp();
+        let exp = (now + Duration::hours(8)).timestamp();
+        let token = create_jwt(&created_user.id, iat, &exp, &secret_key);
+        let cookie_header = format!("session_token={}", token);
+
+        let req_path = format!("{}{}", "/users/", created_user.id);
+        let req = build_req_with_cookie(&req_path, Method::DELETE, &cookie_header);
 
         let res = create_user_routes(user_repository, secret_key)
             .oneshot(req)
@@ -653,12 +678,20 @@ mod test {
         // テスト対象
         let repository = UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
 
+        let secret_key = "secret_key".to_string();
+        let now = Utc::now();
+        let iat = now.timestamp();
+        let exp = (now + Duration::hours(8)).timestamp();
+        let token = create_jwt(&test_user.id, iat, &exp, &secret_key);
+        let cookie_header = format!("session_token={}", token);
+
         let req_path = format!("/quests/{}/participate", test_quest.id);
 
-        let req = build_req_with_json(
+        let req = build_req_with_json_cookie(
             &req_path,
             Method::POST,
             format!("{{\"user_id\": \"{}\" }}", test_user.id).to_string(),
+            &cookie_header,
         );
 
         create_quest_routes(
@@ -925,12 +958,20 @@ mod test {
         // テスト対象
         let repository = UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
 
+        let secret_key = "secret_key".to_string();
+        let now = Utc::now();
+        let iat = now.timestamp();
+        let exp = (now + Duration::hours(8)).timestamp();
+        let token = create_jwt(&test_user.id, iat, &exp, &secret_key);
+        let cookie_header = format!("session_token={}", token);
+
         let path = format!("/challenges/{}/complete", test_challenge.id);
 
-        let req = build_req_with_json(
+        let req = build_req_with_json_cookie(
             &path,
             Method::POST,
             format!("{{\"user_id\": \"{}\" }}", test_user.id).to_string(),
+            &cookie_header,
         );
 
         create_challenge_routes(
