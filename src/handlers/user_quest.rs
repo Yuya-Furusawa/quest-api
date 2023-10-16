@@ -2,7 +2,7 @@ use axum::{
     extract::{Extension, Path},
     http::StatusCode,
     response::IntoResponse,
-    Json, TypedHeader,
+    Json,
 };
 use std::sync::Arc;
 
@@ -11,7 +11,6 @@ use crate::{
         user_challenge::UserChallengeRepository,
         user_quest::{ParticipateQuestPayload, UserQuestRepository},
     },
-    services::user::decode_jwt,
     UserInfoHandlerState,
 };
 
@@ -19,7 +18,12 @@ pub async fn participate_quest<T: UserQuestRepository>(
     Path(quest_id): Path<String>,
     Json(payload): Json<ParticipateQuestPayload>,
     Extension(repository): Extension<Arc<T>>,
+    Extension(user_id_from_token): Extension<String>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    if payload.user_id != user_id_from_token {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
     repository
         .save_quest_participate_event(payload.user_id, quest_id)
         .await
@@ -29,20 +33,12 @@ pub async fn participate_quest<T: UserQuestRepository>(
 }
 
 pub async fn get_participated_quests<T: UserQuestRepository, S: UserChallengeRepository>(
-    TypedHeader(cookie): TypedHeader<axum::headers::Cookie>,
+    Extension(user_id): Extension<String>,
     Extension(state): Extension<UserInfoHandlerState<T, S>>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let cookie_token = match cookie.get("session_token") {
-        None => return Err(StatusCode::UNAUTHORIZED),
-        Some(token) => token,
-    };
-
-    let secret_key = &state.secret_key;
-    let decoded_token = decode_jwt(cookie_token, &secret_key).unwrap();
-
     let quest_ids = state
         .userquest_repository
-        .get_participated_quests_by_user_id(decoded_token.claims.user_id)
+        .get_participated_quests_by_user_id(user_id)
         .await
         .or(Err(StatusCode::NOT_FOUND))?;
 

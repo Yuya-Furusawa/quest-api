@@ -1,10 +1,12 @@
 mod handlers;
 mod infras;
+mod middleware;
 mod repositories;
 mod services;
 
 use axum::{
     extract::Extension,
+    middleware::from_fn,
     routing::{get, post},
     Router,
 };
@@ -22,6 +24,7 @@ use crate::handlers::{
     user_challenge::{complete_challenge, get_completed_challenges},
     user_quest::{get_participated_quests, participate_quest},
 };
+use crate::middleware::auth::auth_middleware;
 use crate::repositories::{
     challenge::{ChallengeRepository, ChallengeRepositoryForDb},
     quest::{QuestRepository, QuestRepositoryForDb},
@@ -81,9 +84,16 @@ fn create_app<
     secret_key: String,
 ) -> Router {
     let user_routes = create_user_routes(user_repository, secret_key.clone());
-    let quest_routes = create_quest_routes(quest_repository, userquest_repository.clone());
-    let challenge_routes =
-        create_challenge_routes(challenge_repository, userchallenge_repository.clone());
+    let quest_routes = create_quest_routes(
+        quest_repository,
+        userquest_repository.clone(),
+        secret_key.clone(),
+    );
+    let challenge_routes = create_challenge_routes(
+        challenge_repository,
+        userchallenge_repository.clone(),
+        secret_key.clone(),
+    );
     let user_info_routes = create_user_info_routes(
         userquest_repository.clone(),
         userchallenge_repository.clone(),
@@ -121,30 +131,48 @@ pub struct UserHandlerState<T: UserRepository> {
 fn create_user_routes<T: UserRepository>(user_repository: T, secret_key: String) -> Router {
     let user_state = UserHandlerState {
         user_repository: Arc::new(user_repository),
-        secret_key,
+        secret_key: secret_key.clone(),
     };
 
-    Router::new()
-        .route("/register", post(register_user::<T>))
-        .route("/login", post(login_user::<T>))
+    let auth_routes = Router::new()
         .route("/users/:id", get(find_user::<T>).delete(delete_user::<T>))
         .route("/user/auth", get(auth_user::<T>))
-        .layer(Extension(user_state))
+        .layer(Extension(user_state.clone()))
+        .layer(from_fn(move |req, next| {
+            auth_middleware(secret_key.clone(), req, next)
+        }));
+
+    let non_auth_routes = Router::new()
+        .route("/register", post(register_user::<T>))
+        .route("/login", post(login_user::<T>))
+        .layer(Extension(user_state));
+
+    Router::new().merge(auth_routes).merge(non_auth_routes)
 }
 
 fn create_quest_routes<T: QuestRepository, S: UserQuestRepository>(
     quest_repository: T,
     userquest_repository: S,
+    secret_key: String,
 ) -> Router {
-    Router::new()
+    let auth_routes = Router::new()
+        .route("/quests/:id/participate", post(participate_quest::<S>))
+        .layer(from_fn(move |req, next| {
+            auth_middleware(secret_key.clone(), req, next)
+        }));
+
+    let non_auth_routes = Router::new()
         .route("/quests", post(create_quest::<T>).get(all_quests::<T>))
         .route(
             "/quests/:id",
             get(find_quest::<T>)
                 .patch(update_quest::<T>)
                 .delete(delete_quest::<T>),
-        )
-        .route("/quests/:id/participate", post(participate_quest::<S>))
+        );
+
+    Router::new()
+        .merge(auth_routes)
+        .merge(non_auth_routes)
         .layer(Extension(Arc::new(quest_repository)))
         .layer(Extension(Arc::new(userquest_repository)))
 }
@@ -152,14 +180,24 @@ fn create_quest_routes<T: QuestRepository, S: UserQuestRepository>(
 fn create_challenge_routes<T: ChallengeRepository, S: UserChallengeRepository>(
     challenge_repository: T,
     userchallenge_repository: S,
+    secret_key: String,
 ) -> Router {
-    Router::new()
+    let auth_routes = Router::new()
+        .route("/challenges/:id/complete", post(complete_challenge::<S>))
+        .layer(from_fn(move |req, next| {
+            auth_middleware(secret_key.clone(), req, next)
+        }));
+
+    let non_auth_routes = Router::new()
         .route(
             "/challenges",
             post(create_challenge::<T>).get(find_challenge_by_quest_id::<T>),
         )
-        .route("/challenges/:id", get(find_challenge::<T>))
-        .route("/challenges/:id/complete", post(complete_challenge::<S>))
+        .route("/challenges/:id", get(find_challenge::<T>));
+
+    Router::new()
+        .merge(auth_routes)
+        .merge(non_auth_routes)
         .layer(Extension(Arc::new(challenge_repository)))
         .layer(Extension(Arc::new(userchallenge_repository)))
 }
@@ -168,7 +206,6 @@ fn create_challenge_routes<T: ChallengeRepository, S: UserChallengeRepository>(
 pub struct UserInfoHandlerState<T: UserQuestRepository, S: UserChallengeRepository> {
     userquest_repository: Arc<T>,
     userchallenge_repository: Arc<S>,
-    secret_key: String,
 }
 
 fn create_user_info_routes<T: UserQuestRepository, S: UserChallengeRepository>(
@@ -179,7 +216,6 @@ fn create_user_info_routes<T: UserQuestRepository, S: UserChallengeRepository>(
     let user_info_state = UserInfoHandlerState {
         userquest_repository: Arc::new(userquest_repository),
         userchallenge_repository: Arc::new(userchallenge_repository),
-        secret_key,
     };
 
     Router::new()
@@ -192,6 +228,9 @@ fn create_user_info_routes<T: UserQuestRepository, S: UserChallengeRepository>(
             get(get_completed_challenges::<T, S>),
         )
         .layer(Extension(user_info_state))
+        .layer(from_fn(move |req, next| {
+            auth_middleware(secret_key.clone(), req, next)
+        }))
 }
 
 async fn root() -> &'static str {
@@ -245,6 +284,21 @@ mod test {
             .method(method)
             .header("Cookie", cookie)
             .body(Body::empty())
+            .unwrap()
+    }
+
+    fn build_req_with_json_cookie(
+        path: &str,
+        method: Method,
+        json_body: String,
+        cookie: &str,
+    ) -> Request<Body> {
+        Request::builder()
+            .uri(path)
+            .method(method)
+            .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+            .header("Cookie", cookie)
+            .body(Body::from(json_body))
             .unwrap()
     }
 
@@ -322,6 +376,7 @@ mod test {
         let res = create_quest_routes(
             QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
             UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
@@ -354,6 +409,7 @@ mod test {
         let res = create_quest_routes(
             quest_repository,
             UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
@@ -383,6 +439,7 @@ mod test {
         let res = create_quest_routes(
             quest_repository.clone(),
             UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
@@ -423,6 +480,7 @@ mod test {
         let res = create_quest_routes(
             quest_repository,
             UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
@@ -448,6 +506,7 @@ mod test {
         let res = create_quest_routes(
             quest_repository,
             UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
@@ -541,10 +600,15 @@ mod test {
             .await
             .expect("failed to create user");
 
-        let req_path = format!("{}{}", "/users/", created_user.id);
-        let req = build_req_with_empty(&req_path, Method::GET);
-
         let secret_key = "secret_key".to_string();
+        let now = Utc::now();
+        let iat = now.timestamp();
+        let exp = (now + Duration::hours(8)).timestamp();
+        let token = create_jwt(&created_user.id, iat, &exp, &secret_key);
+        let cookie_header = format!("session_token={}", token);
+
+        let req_path = format!("{}{}", "/users/", created_user.id);
+        let req = build_req_with_cookie(&req_path, Method::GET, &cookie_header);
 
         let res = create_user_routes(user_repository, secret_key)
             .oneshot(req)
@@ -560,7 +624,7 @@ mod test {
         let user_repository = UserRepositoryForDb::with_url(DB_URL_FOR_TEST)
             .await
             .unwrap();
-        let creared_user = user_repository
+        let created_user = user_repository
             .register(RegisterUser::new(
                 "Test User".to_string(),
                 "test@test.com".to_string(),
@@ -569,10 +633,15 @@ mod test {
             .await
             .expect("failed to create user");
 
-        let req_path = format!("{}{}", "/users/", creared_user.id);
-        let req = build_req_with_empty(&req_path, Method::DELETE);
-
         let secret_key = "secret_key".to_string();
+        let now = Utc::now();
+        let iat = now.timestamp();
+        let exp = (now + Duration::hours(8)).timestamp();
+        let token = create_jwt(&created_user.id, iat, &exp, &secret_key);
+        let cookie_header = format!("session_token={}", token);
+
+        let req_path = format!("{}{}", "/users/", created_user.id);
+        let req = build_req_with_cookie(&req_path, Method::DELETE, &cookie_header);
 
         let res = create_user_routes(user_repository, secret_key)
             .oneshot(req)
@@ -609,17 +678,26 @@ mod test {
         // テスト対象
         let repository = UserQuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
 
+        let secret_key = "secret_key".to_string();
+        let now = Utc::now();
+        let iat = now.timestamp();
+        let exp = (now + Duration::hours(8)).timestamp();
+        let token = create_jwt(&test_user.id, iat, &exp, &secret_key);
+        let cookie_header = format!("session_token={}", token);
+
         let req_path = format!("/quests/{}/participate", test_quest.id);
 
-        let req = build_req_with_json(
+        let req = build_req_with_json_cookie(
             &req_path,
             Method::POST,
             format!("{{\"user_id\": \"{}\" }}", test_user.id).to_string(),
+            &cookie_header,
         );
 
         create_quest_routes(
             QuestRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
             repository.clone(),
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
@@ -767,6 +845,7 @@ mod test {
         let res = create_challenge_routes(
             ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
             UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
@@ -800,6 +879,7 @@ mod test {
         let res = create_challenge_routes(
             challenge_repository,
             UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
@@ -832,6 +912,7 @@ mod test {
         let res = create_challenge_routes(
             challenge_repository,
             UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
@@ -877,17 +958,26 @@ mod test {
         // テスト対象
         let repository = UserChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await;
 
+        let secret_key = "secret_key".to_string();
+        let now = Utc::now();
+        let iat = now.timestamp();
+        let exp = (now + Duration::hours(8)).timestamp();
+        let token = create_jwt(&test_user.id, iat, &exp, &secret_key);
+        let cookie_header = format!("session_token={}", token);
+
         let path = format!("/challenges/{}/complete", test_challenge.id);
 
-        let req = build_req_with_json(
+        let req = build_req_with_json_cookie(
             &path,
             Method::POST,
             format!("{{\"user_id\": \"{}\" }}", test_user.id).to_string(),
+            &cookie_header,
         );
 
         create_challenge_routes(
             ChallengeRepositoryForDb::with_url(DB_URL_FOR_TEST).await,
             repository.clone(),
+            "secret_key".to_string(),
         )
         .oneshot(req)
         .await
