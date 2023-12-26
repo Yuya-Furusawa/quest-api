@@ -5,7 +5,7 @@ use axum::{
     Json, TypedHeader,
 };
 use chrono::{Duration, Utc};
-use cookie::{time::OffsetDateTime, Cookie, Expiration};
+use cookie::{time::OffsetDateTime, Cookie, Expiration, SameSite};
 
 use crate::{
     repositories::user::{LoginUser, RegisterUser, UserRepository},
@@ -37,6 +37,7 @@ pub async fn register_user<T: UserRepository>(
         ))
         .secure(true)
         .http_only(true)
+        .same_site(SameSite::None)
         .finish();
 
     Ok((
@@ -70,6 +71,7 @@ pub async fn login_user<T: UserRepository>(
         ))
         .secure(true)
         .http_only(true)
+        .same_site(SameSite::None)
         .finish();
 
     Ok((
