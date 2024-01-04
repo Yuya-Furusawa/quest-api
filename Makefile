@@ -11,8 +11,8 @@ migrate:
 	docker-compose exec api sqlx migrate run --ignore-missing
 
 seed:
-	docker cp ./seeds/seed.sql quest-api_database_1:/tmp/
-	docker exec quest-api_database_1 psql -U $(DATABASE_USER) -d $(DATABASE_DB) -q -f /tmp/seed.sql
+	docker cp ./seeds/seed.sql quest-database-container:/tmp/
+	docker exec quest-database-container psql -U $(DATABASE_USER) -d $(DATABASE_DB) -q -f /tmp/seed.sql
 
 start: up migrate seed
 
