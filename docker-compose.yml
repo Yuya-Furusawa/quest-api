@@ -1,6 +1,7 @@
 version: '3.8'
 services:
   database:
+    container_name: quest-database-container
     build:
       context: .
       dockerfile: ./docker/db/Dockerfile
@@ -16,6 +17,7 @@ services:
       TZ: Asia/Tokyo
     restart: always
   api:
+    container_name: quest-api-container
     build:
       context: .
       dockerfile: ./docker/web/Dockerfile
