@@ -1,5 +1,5 @@
 # ベースイメージを指定
-FROM rust:1.68
+FROM rust:1.73
 
 # 作業ディレクトリを設定
 WORKDIR /usr/src/app
@@ -8,7 +8,7 @@ WORKDIR /usr/src/app
 COPY . .
 
 # sqlx-cliツールをインストール
-RUN cargo install --locked sqlx-cli cargo-watch
+RUN cargo install sqlx-cli cargo-watch
 
 # 依存関係をビルドし、キャッシュを利用する
 RUN cargo build --release
