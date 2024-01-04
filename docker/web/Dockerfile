@@ -1,5 +1,5 @@
 # ベースイメージを指定
-FROM rust:1.68
+FROM rust:1.73
 
 # 作業ディレクトリを設定
 WORKDIR /usr/src/app
